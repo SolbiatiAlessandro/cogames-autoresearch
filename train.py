@@ -55,10 +55,7 @@ from cogames.cli.mission import get_mission
 from cogames.cli.policy import parse_policy_spec
 from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
 from cogames.device import resolve_training_device
-from mettagrid.policy.loader import discover_and_register_policies
 import cogames.train as train_module
-
-discover_and_register_policies(".")
 
 mission = {mission!r}
 reward_variants = {reward_variants!r}
