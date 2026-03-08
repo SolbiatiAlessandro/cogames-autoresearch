@@ -49,3 +49,36 @@
   Fix: try role_conditional rewards or milestones_2 with higher compounding.
 - **Agents ignore each other**: no coordination behaviors emerge.
   Fix: this is THE research problem. See social influence papers in knowledge/.
+
+## Critical: Use Reward Variants or Score Will Be Zero
+
+On CPU with a 10-minute budget, agents WILL NOT capture territory without reward shaping. The objective reward (junctions held) is too sparse to learn from in short runs.
+
+**Always use at least one reward variant.** The recommended starting point:
+
+```python
+REWARD_VARIANTS = ["milestones_2"]  # default compounding factor 5.0
+```
+
+Or with custom compounding factor:
+```python
+REWARD_VARIANTS = ["milestones_2:25"]  # more aggressive
+```
+
+### Confirmed available variants (from cogames/reward_variants.py)
+```python
+"objective"          # base territory reward (default, always active)
+"no_objective"       # remove territory reward entirely
+"milestones"         # rewards for scrambling/aligning junctions
+"milestones_2"       # capped role-shaped rewards + compounding factor
+"milestones_2:N"     # milestones_2 with custom compounding factor N (e.g. 5, 10, 25)
+"credit"             # dense rewards for resource/gear acquisition
+"miner"              # miner-shaped rewards for all agents
+"aligner"            # aligner-shaped rewards for all agents
+"scrambler"          # scrambler-shaped rewards for all agents
+"scout"              # scout-shaped rewards for all agents
+"role_conditional"   # per-agent role-based shaping
+"penalize_vibe_change" # -0.01 for changing roles
+```
+
+Check at runtime: `uv run python -c "from cogames.cogs_vs_clips.reward_variants import AVAILABLE_REWARD_VARIANTS; print(AVAILABLE_REWARD_VARIANTS)"`
