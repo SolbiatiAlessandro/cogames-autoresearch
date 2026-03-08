@@ -83,6 +83,7 @@ train_module.train(
     seed=42,
     minibatch_size=minibatch_size,
     log_outputs=True,
+    checkpoint_interval=10,
 )
 """
 
@@ -282,22 +283,23 @@ def main():
     eval_stats, train_stats = parse_metrics_from_output(output_lines)
 
     # Extract mean_reward from stats
+    # The label key may have variant names appended: e.g. "MISSION.milestones_2"
     mean_reward = 0.0
-    reward_keys = [
+    reward_prefixes = [
         f"per_label_rewards/{MISSION}",
         f"environment/per_label_rewards/{MISSION}",
         "episode_return",
         "environment/episode_return",
     ]
-    # Check eval stats first, then train stats
+    # Check eval stats first, then train stats; use prefix match for label keys
     for stats in [eval_stats, train_stats]:
         if mean_reward != 0.0:
             break
-        for key in reward_keys:
-            if key in stats:
+        for key in stats:
+            if any(key == p or key.startswith(p) for p in reward_prefixes):
                 val = stats[key]
                 if isinstance(val, (list, tuple)):
-                    mean_reward = sum(val) / len(val) if val else 0.0
+                    mean_reward = sum(float(v) for v in val) / len(val) if val else 0.0
                 else:
                     mean_reward = float(val)
                 if mean_reward != 0.0:
