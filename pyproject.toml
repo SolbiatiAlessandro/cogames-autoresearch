@@ -1,0 +1,12 @@
+[project]
+name = "cogames-autoresearch"
+version = "0.1.0"
+description = "Autonomous RL research on CoGames (Cogs vs Clips) using the autoresearch pattern"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "cogames",
+    "torch>=2.0",
+]
+
+[tool.uv.sources]
+cogames = { path = "../cogames" }

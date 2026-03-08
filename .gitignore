@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+run.log
+train_dir/
+*.pt
+*.safetensors
+uv.lock
