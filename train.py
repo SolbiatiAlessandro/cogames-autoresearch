@@ -34,14 +34,14 @@ HIDDEN_SIZE = 256
 
 # Training hyperparameters
 LEARNING_RATE = 0.00092
-MINIBATCH_SIZE = 4096
+MINIBATCH_SIZE = 8192
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones (no compounding)"
+DESCRIPTION = "milestones minibatch=8192"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
