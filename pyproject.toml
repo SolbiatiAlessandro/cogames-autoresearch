@@ -5,8 +5,12 @@ description = "Autonomous RL research on CoGames (Cogs vs Clips) using the autor
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "cogames",
+    "mettagrid==0.15.0",
     "torch>=2.0",
 ]
 
+[tool.uv]
+override-dependencies = ["mettagrid==0.15.0"]
+
 [tool.uv.sources]
-cogames = { path = "../cogames" }
+cogames = { path = "../Projects/cogames" }
