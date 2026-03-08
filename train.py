@@ -25,7 +25,7 @@ from prepare import TIME_BUDGET, MISSION, compute_composite_score
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2"]  # available: standard, hard, speed_run, etc. (see `cogames variants`)
+REWARD_VARIANTS = ["milestones_2"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -44,36 +44,64 @@ DEVICE = "auto"  # auto, cpu, cuda, mps
 DESCRIPTION = "milestones_2 baseline"
 
 # ---------------------------------------------------------------------------
-# Training — run cogames tutorial train with the above config
+# Training — use cogames Python API directly to support reward variants
 # ---------------------------------------------------------------------------
+
+TRAIN_SCRIPT = """
+import sys
+from pathlib import Path
+from rich.console import Console
+from cogames.cli.mission import get_mission
+from cogames.cli.policy import parse_policy_spec
+from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
+from cogames.device import resolve_training_device
+from mettagrid.policy.loader import discover_and_register_policies
+import cogames.train as train_module
+
+discover_and_register_policies(".")
+
+mission = {mission!r}
+reward_variants = {reward_variants!r}
+policy_str = {policy!r}
+device_str = {device!r}
+num_steps = {num_steps!r}
+minibatch_size = {minibatch_size!r}
+checkpoints = {checkpoints!r}
+
+name, env_cfg, _ = get_mission(mission)
+if reward_variants:
+    apply_reward_variants(env_cfg, variants=reward_variants)
+
+policy_spec = parse_policy_spec(policy_str)
+console = Console()
+device = resolve_training_device(console, device_str)
+
+train_module.train(
+    env_cfg=env_cfg,
+    policy_class_path=policy_spec.class_path,
+    initial_weights_path=policy_spec.data_path,
+    device=device,
+    num_steps=num_steps,
+    checkpoints_path=Path(checkpoints),
+    seed=42,
+    minibatch_size=minibatch_size,
+    log_outputs=True,
+)
+"""
 
 
 def build_train_command():
-    """Build the cogames training CLI command from config above."""
-    cmd = [
-        "cogames",
-        "tutorial",
-        "train",
-        "-m",
-        MISSION,
-        "-p",
-        POLICY,
-        "--steps",
-        str(NUM_STEPS),
-        "--minibatch-size",
-        str(MINIBATCH_SIZE),
-        "--device",
-        DEVICE,
-        "--checkpoints",
-        "./train_dir",
-        "--log-outputs",
-    ]
-
-    # Add reward variants
-    for variant in REWARD_VARIANTS:
-        cmd.extend(["-v", variant])
-
-    return cmd
+    """Build the training command using cogames Python API (supports reward variants)."""
+    script = TRAIN_SCRIPT.format(
+        mission=MISSION,
+        reward_variants=REWARD_VARIANTS,
+        policy=POLICY,
+        device=DEVICE,
+        num_steps=NUM_STEPS,
+        minibatch_size=MINIBATCH_SIZE,
+        checkpoints="./train_dir",
+    )
+    return ["uv", "run", "python", "-c", script]
 
 
 def find_latest_checkpoint(train_dir="./train_dir"):
@@ -208,7 +236,7 @@ def main():
     print("=" * 60)
 
     cmd = build_train_command()
-    print(f"\nRunning: {' '.join(cmd)}\n")
+    print(f"\nRunning: uv run python -c <train_script> (mission={MISSION}, variants={REWARD_VARIANTS})\n")
 
     # Run training with time budget enforcement
     output_lines = []
@@ -241,7 +269,7 @@ def main():
         returncode = process.returncode or 0
 
     except FileNotFoundError:
-        print("ERROR: 'cogames' CLI not found. Install with: pip install cogames")
+        print("ERROR: 'uv' not found.")
         sys.exit(1)
 
     training_seconds = time.time() - t_start
@@ -257,8 +285,6 @@ def main():
     eval_stats, train_stats = parse_metrics_from_output(output_lines)
 
     # Extract mean_reward from stats
-    # Eval stats use keys like 'per_label_rewards/cogsguard_machina_1.basic'
-    # Train stats use keys like 'environment/per_label_rewards/...'
     mean_reward = 0.0
     reward_keys = [
         f"per_label_rewards/{MISSION}",
@@ -287,7 +313,7 @@ def main():
             explained_var = float(train_stats[key])
             break
 
-    # Composite score (deposit_diversity=0 for now, just mean_reward)
+    # Composite score
     composite_score = compute_composite_score(mean_reward)
 
     # Find checkpoint
