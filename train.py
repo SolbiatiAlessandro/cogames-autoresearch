@@ -25,7 +25,7 @@ from prepare import TIME_BUDGET, MISSION, compute_composite_score
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = []  # available: standard, hard, speed_run, etc. (see `cogames variants`)
+REWARD_VARIANTS = ["milestones_2"]  # available: standard, hard, speed_run, etc. (see `cogames variants`)
 NUM_AGENTS = 4
 
 # Policy
@@ -41,7 +41,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "baseline"
+DESCRIPTION = "milestones_2 baseline"
 
 # ---------------------------------------------------------------------------
 # Training — run cogames tutorial train with the above config

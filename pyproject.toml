@@ -13,4 +13,4 @@ dependencies = [
 override-dependencies = ["mettagrid==0.15.0"]
 
 [tool.uv.sources]
-cogames = { path = "../Projects/cogames" }
+cogames = { path = "../cogames" }
