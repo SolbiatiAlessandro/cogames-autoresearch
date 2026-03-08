@@ -26,7 +26,7 @@ from prepare import TIME_BUDGET, MISSION, compute_composite_score
 
 # Mission and reward setup
 REWARD_VARIANTS = ["milestones", "role_conditional", "penalize_vibe_change", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
-NUM_AGENTS = 6
+NUM_AGENTS = 4
 
 # Policy
 POLICY = "class=lstm"  # options: lstm, baseline, stateless, or custom class path
@@ -35,14 +35,15 @@ HIDDEN_SIZE = 256
 # Training hyperparameters
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
-GAMMA = 0.99  # default 0.995; trying lower for faster credit assignment
+GAMMA = 0.995  # default
+BPTT_HORIZON = 128  # default 64; longer context for multi-agent coordination
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones + role_conditional + penalize_vibe_change + credit gamma=0.99"
+DESCRIPTION = "milestones + role_conditional + penalize_vibe_change + credit bptt=128"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -68,12 +69,14 @@ minibatch_size = {minibatch_size!r}
 checkpoints = {checkpoints!r}
 learning_rate = {learning_rate!r}
 gamma = {gamma!r}
+bptt_horizon = {bptt_horizon!r}
 
 _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
     def __init__(self, train_args, *args, **kwargs):
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
+        train_args['bptt_horizon'] = bptt_horizon
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
@@ -112,6 +115,7 @@ def build_train_command():
         checkpoints="./train_dir",
         learning_rate=LEARNING_RATE,
         gamma=GAMMA,
+        bptt_horizon=BPTT_HORIZON,
     )
     return ["uv", "run", "python", "-c", script]
 
