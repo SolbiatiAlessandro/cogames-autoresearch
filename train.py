@@ -35,13 +35,14 @@ HIDDEN_SIZE = 256
 # Training hyperparameters
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
+GAMMA = 0.99  # default 0.995; trying lower for faster credit assignment
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones + role_conditional + penalize_vibe_change + credit num_agents=6"
+DESCRIPTION = "milestones + role_conditional + penalize_vibe_change + credit gamma=0.99"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -66,11 +67,13 @@ num_steps = {num_steps!r}
 minibatch_size = {minibatch_size!r}
 checkpoints = {checkpoints!r}
 learning_rate = {learning_rate!r}
+gamma = {gamma!r}
 
 _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
     def __init__(self, train_args, *args, **kwargs):
         train_args['learning_rate'] = learning_rate
+        train_args['gamma'] = gamma
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
@@ -108,6 +111,7 @@ def build_train_command():
         minibatch_size=MINIBATCH_SIZE,
         checkpoints="./train_dir",
         learning_rate=LEARNING_RATE,
+        gamma=GAMMA,
     )
     return ["uv", "run", "python", "-c", script]
 
