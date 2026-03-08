@@ -33,7 +33,7 @@ POLICY = "class=lstm"  # options: lstm, baseline, stateless, or custom class pat
 HIDDEN_SIZE = 256
 
 # Training hyperparameters
-LEARNING_RATE = 0.00092
+LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -41,7 +41,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones minibatch=8192"
+DESCRIPTION = "milestones minibatch=8192 lr=0.001"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -55,6 +55,7 @@ from cogames.cli.mission import get_mission
 from cogames.cli.policy import parse_policy_spec
 from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
 from cogames.device import resolve_training_device
+import pufferlib.pufferl as pufferl_module
 import cogames.train as train_module
 
 mission = {mission!r}
@@ -64,6 +65,14 @@ device_str = {device!r}
 num_steps = {num_steps!r}
 minibatch_size = {minibatch_size!r}
 checkpoints = {checkpoints!r}
+learning_rate = {learning_rate!r}
+
+_OrigPuffeRL = pufferl_module.PuffeRL
+class _PatchedPuffeRL(_OrigPuffeRL):
+    def __init__(self, train_args, *args, **kwargs):
+        train_args['learning_rate'] = learning_rate
+        super().__init__(train_args, *args, **kwargs)
+pufferl_module.PuffeRL = _PatchedPuffeRL
 
 name, env_cfg, _ = get_mission(mission)
 if reward_variants:
@@ -98,6 +107,7 @@ def build_train_command():
         num_steps=NUM_STEPS,
         minibatch_size=MINIBATCH_SIZE,
         checkpoints="./train_dir",
+        learning_rate=LEARNING_RATE,
     )
     return ["uv", "run", "python", "-c", script]
 
