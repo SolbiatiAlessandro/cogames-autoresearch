@@ -13,4 +13,12 @@ dependencies = [
 override-dependencies = ["mettagrid==0.15.0"]
 
 [tool.uv.sources]
-cogames = { path = "../Projects/cogames" }
+cogames = { path = "../cogames" }
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.8",
+    "nbconvert>=7.17.0",
+    "pandas>=3.0.1",
+]

@@ -25,7 +25,7 @@ from prepare import TIME_BUDGET, MISSION, compute_composite_score
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = []  # available: standard, hard, speed_run, etc. (see `cogames variants`)
+REWARD_VARIANTS = ["milestones", "role_conditional", "credit", "scout"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -33,47 +33,91 @@ POLICY = "class=lstm"  # options: lstm, baseline, stateless, or custom class pat
 HIDDEN_SIZE = 256
 
 # Training hyperparameters
-LEARNING_RATE = 0.00092
-MINIBATCH_SIZE = 4096
+LEARNING_RATE = 0.001
+MINIBATCH_SIZE = 8192
+GAMMA = 0.995  # default
+BPTT_HORIZON = 64  # default
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "baseline"
+DESCRIPTION = "milestones + role_conditional + credit + scout (no penalize_vibe_change)"
 
 # ---------------------------------------------------------------------------
-# Training — run cogames tutorial train with the above config
+# Training — use cogames Python API directly to support reward variants
 # ---------------------------------------------------------------------------
+
+TRAIN_SCRIPT = """
+import sys
+from pathlib import Path
+from rich.console import Console
+from cogames.cli.mission import get_mission
+from cogames.cli.policy import parse_policy_spec
+from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
+from cogames.device import resolve_training_device
+import pufferlib.pufferl as pufferl_module
+import cogames.train as train_module
+
+mission = {mission!r}
+reward_variants = {reward_variants!r}
+policy_str = {policy!r}
+device_str = {device!r}
+num_steps = {num_steps!r}
+minibatch_size = {minibatch_size!r}
+checkpoints = {checkpoints!r}
+learning_rate = {learning_rate!r}
+gamma = {gamma!r}
+bptt_horizon = {bptt_horizon!r}
+
+_OrigPuffeRL = pufferl_module.PuffeRL
+class _PatchedPuffeRL(_OrigPuffeRL):
+    def __init__(self, train_args, *args, **kwargs):
+        train_args['learning_rate'] = learning_rate
+        train_args['gamma'] = gamma
+        train_args['bptt_horizon'] = bptt_horizon
+        super().__init__(train_args, *args, **kwargs)
+pufferl_module.PuffeRL = _PatchedPuffeRL
+
+name, env_cfg, _ = get_mission(mission)
+if reward_variants:
+    apply_reward_variants(env_cfg, variants=reward_variants)
+
+policy_spec = parse_policy_spec(policy_str)
+console = Console()
+device = resolve_training_device(console, device_str)
+
+train_module.train(
+    env_cfg=env_cfg,
+    policy_class_path=policy_spec.class_path,
+    initial_weights_path=policy_spec.data_path,
+    device=device,
+    num_steps=num_steps,
+    checkpoints_path=Path(checkpoints),
+    seed=42,
+    minibatch_size=minibatch_size,
+    log_outputs=True,
+    checkpoint_interval=10,
+)
+"""
 
 
 def build_train_command():
-    """Build the cogames training CLI command from config above."""
-    cmd = [
-        "cogames",
-        "tutorial",
-        "train",
-        "-m",
-        MISSION,
-        "-p",
-        POLICY,
-        "--steps",
-        str(NUM_STEPS),
-        "--minibatch-size",
-        str(MINIBATCH_SIZE),
-        "--device",
-        DEVICE,
-        "--checkpoints",
-        "./train_dir",
-        "--log-outputs",
-    ]
-
-    # Add reward variants
-    for variant in REWARD_VARIANTS:
-        cmd.extend(["-v", variant])
-
-    return cmd
+    """Build the training command using cogames Python API (supports reward variants)."""
+    script = TRAIN_SCRIPT.format(
+        mission=MISSION,
+        reward_variants=REWARD_VARIANTS,
+        policy=POLICY,
+        device=DEVICE,
+        num_steps=NUM_STEPS,
+        minibatch_size=MINIBATCH_SIZE,
+        checkpoints="./train_dir",
+        learning_rate=LEARNING_RATE,
+        gamma=GAMMA,
+        bptt_horizon=BPTT_HORIZON,
+    )
+    return ["uv", "run", "python", "-c", script]
 
 
 def find_latest_checkpoint(train_dir="./train_dir"):
@@ -208,7 +252,7 @@ def main():
     print("=" * 60)
 
     cmd = build_train_command()
-    print(f"\nRunning: {' '.join(cmd)}\n")
+    print(f"\nRunning: uv run python -c <train_script> (mission={MISSION}, variants={REWARD_VARIANTS})\n")
 
     # Run training with time budget enforcement
     output_lines = []
@@ -241,7 +285,7 @@ def main():
         returncode = process.returncode or 0
 
     except FileNotFoundError:
-        print("ERROR: 'cogames' CLI not found. Install with: pip install cogames")
+        print("ERROR: 'uv' not found.")
         sys.exit(1)
 
     training_seconds = time.time() - t_start
@@ -257,24 +301,23 @@ def main():
     eval_stats, train_stats = parse_metrics_from_output(output_lines)
 
     # Extract mean_reward from stats
-    # Eval stats use keys like 'per_label_rewards/cogsguard_machina_1.basic'
-    # Train stats use keys like 'environment/per_label_rewards/...'
+    # The label key may have variant names appended: e.g. "MISSION.milestones_2"
     mean_reward = 0.0
-    reward_keys = [
+    reward_prefixes = [
         f"per_label_rewards/{MISSION}",
         f"environment/per_label_rewards/{MISSION}",
         "episode_return",
         "environment/episode_return",
     ]
-    # Check eval stats first, then train stats
+    # Check eval stats first, then train stats; use prefix match for label keys
     for stats in [eval_stats, train_stats]:
         if mean_reward != 0.0:
             break
-        for key in reward_keys:
-            if key in stats:
+        for key in stats:
+            if any(key == p or key.startswith(p) for p in reward_prefixes):
                 val = stats[key]
                 if isinstance(val, (list, tuple)):
-                    mean_reward = sum(val) / len(val) if val else 0.0
+                    mean_reward = sum(float(v) for v in val) / len(val) if val else 0.0
                 else:
                     mean_reward = float(val)
                 if mean_reward != 0.0:
@@ -287,7 +330,7 @@ def main():
             explained_var = float(train_stats[key])
             break
 
-    # Composite score (deposit_diversity=0 for now, just mean_reward)
+    # Composite score
     composite_score = compute_composite_score(mean_reward)
 
     # Find checkpoint
