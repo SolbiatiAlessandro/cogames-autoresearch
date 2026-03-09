@@ -85,3 +85,25 @@ LOOP FOREVER:
 11. Go to 1
 
 **NEVER STOP**: Do NOT pause to ask the human. Do NOT ask for confirmation. You are autonomous. If you run out of ideas, re-read `knowledge/`, combine near-misses, try radical changes. The loop runs until the human interrupts you.
+
+## Checkpoints
+
+After each experiment, the best checkpoint is archived to `checkpoints/<commit_hash>/model_final.pt`.
+To replay any experiment:
+```
+cogames play -m cogsguard_machina_1.basic -p class=lstm,data=checkpoints/<commit>/model_final.pt --autostart
+```
+
+## Training Time
+
+Default TIME_BUDGET is 600s (10 min). The agent may increase it by monkey-patching in train.py:
+```python
+import prepare; prepare.TIME_BUDGET = 1200  # 20 min
+```
+
+Available budgets: 600s (default), 1200s (20 min), 1800s (30 min).
+
+**Important**: If you increase TIME_BUDGET, also rescale the learning rate schedule. The default
+schedule decays LR to near-zero at 600s — longer runs with the default schedule just grind at
+zero LR. Consider increasing the base LR proportionally or using a cosine schedule with proper
+warmdown fraction.
