@@ -167,7 +167,7 @@ Prioritize experiments that move the GAME metrics, not just composite_score.
 === YOUR TASK: Run ONE complete experiment iteration ===
 
 Follow program.md exactly. Summary of the loop:
-1. Read program.md, knowledge/reward_variants.md, knowledge/training_tips.md
+1. Read program.md and ALL files in knowledge/ (especially knowledge/findings.md — critical lessons from previous sessions)
 2. Look at results above — pick ONE new experiment idea NOT already tried
 3. The best combo so far: milestones + role_conditional + penalize_vibe_change + credit + scout (score 234.0)
 4. Be creative — explore new hyperparams, architecture, variant combos, or revisit promising ideas with tweaks.
