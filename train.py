@@ -33,7 +33,7 @@ POLICY = "class=lstm"  # options: lstm, baseline, stateless, or custom class pat
 HIDDEN_SIZE = 256
 
 # Training hyperparameters
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.002  # 2x default; dense credit+scout rewards may allow faster convergence
 MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
 BPTT_HORIZON = 64  # default
@@ -43,7 +43,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + credit + scout"
+DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + credit + scout lr=0.002"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
