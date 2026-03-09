@@ -138,6 +138,19 @@ $(cat results.tsv 2>/dev/null || echo 'no results yet')
 
 === CURRENT BEST SCORE: ${BEST_SCORE} ===
 
+=== ⚠️ REWARD HACKING WARNING ===
+The composite_score is the sum of ALL shaped rewards (milestones, credit, scout, etc.).
+A high composite_score does NOT mean agents are winning the game.
+results.tsv now tracks 5 game metrics that measure ACTUAL game performance:
+  - junctions_held: cumulative junctions held by our team (THE game objective)
+  - junctions_aligned: junctions we captured
+  - junctions_scrambled: enemy junctions disrupted
+  - carbon_deposited: resources deposited at hub (productive mining)
+  - cells_visited: exploration coverage
+When evaluating experiments, look at BOTH composite_score AND these game metrics.
+An experiment that increases composite_score but has 0 junctions_held is reward hacking.
+Prefer experiments that improve the actual game metrics, even at lower composite_score.
+
 === YOUR TASK: Run ONE complete experiment iteration ===
 
 Follow program.md exactly. Summary of the loop:

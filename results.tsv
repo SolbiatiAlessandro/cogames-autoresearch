@@ -1,4 +1,4 @@
-commit	composite_score	mean_reward	memory_gb	status	description
+commit	composite_score	mean_reward	memory_gb	status	description	junctions_held	junctions_aligned	junctions_scrambled	carbon_deposited	cells_visited
 ee360ae	0.000000	0.000000	0.000	crash	milestones_2 baseline
 83479bb	0.000000	0.000000	0.000	crash	milestones_2 baseline
 e107db6	0.000000	0.000000	0.000	crash	milestones_2 baseline
@@ -54,3 +54,4 @@ d546ec0	22.824655	22.824655	0.000	keep	milestones_2 + role_conditional + penaliz
 e3b2a41	80.389570	80.389570	0.000	keep	milestones + role_conditional + penalize_vibe_change + scout (no credit)
 e3b2a41	80.389570	80.389570	0.000	discard	milestones + role_conditional + penalize_vibe_change + scout (no credit)
 e8a1f18	0.000000	0.000000	0.000	crash	milestones + role_conditional + credit + scout (no penalize_vibe_change)
+d4da31b	322.241272	322.241272	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout

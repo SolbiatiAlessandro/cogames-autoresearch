@@ -205,7 +205,9 @@ def get_commit_hash():
 
 
 def log_to_results_tsv(
-    commit, composite_score, mean_reward, memory_gb, status, description
+    commit, composite_score, mean_reward, memory_gb, status, description,
+    junctions_held=0, junctions_aligned=0, junctions_scrambled=0,
+    carbon_deposited=0, cells_visited=0,
 ):
     """Append a row to results.tsv, creating the file with header if needed."""
     tsv_path = "results.tsv"
@@ -222,6 +224,11 @@ def log_to_results_tsv(
                     "memory_gb",
                     "status",
                     "description",
+                    "junctions_held",
+                    "junctions_aligned",
+                    "junctions_scrambled",
+                    "carbon_deposited",
+                    "cells_visited",
                 ]
             )
         writer.writerow(
@@ -232,6 +239,11 @@ def log_to_results_tsv(
                 f"{memory_gb:.3f}",
                 status,
                 description,
+                f"{junctions_held:.1f}",
+                f"{junctions_aligned:.1f}",
+                f"{junctions_scrambled:.1f}",
+                f"{carbon_deposited:.1f}",
+                f"{cells_visited:.1f}",
             ]
         )
 
@@ -330,6 +342,36 @@ def main():
             explained_var = float(train_stats[key])
             break
 
+    # ---------------------------------------------------------------------------
+    # Game metrics (track actual game performance, not just shaped rewards)
+    # ---------------------------------------------------------------------------
+    game_metrics = {
+        "junctions_held": 0.0,
+        "junctions_aligned": 0.0,
+        "junctions_scrambled": 0.0,
+        "carbon_deposited": 0.0,
+        "cells_visited": 0.0,
+    }
+    GAME_METRIC_KEYS = {
+        "junctions_held": ["game/cogs/aligned.junction.held", "environment/game/cogs/aligned.junction.held"],
+        "junctions_aligned": ["agent/junction.aligned_by_agent", "environment/agent/junction.aligned_by_agent"],
+        "junctions_scrambled": ["agent/junction.scrambled_by_agent", "environment/agent/junction.scrambled_by_agent"],
+        "carbon_deposited": ["game/cogs/carbon.deposited", "environment/game/cogs/carbon.deposited"],
+        "cells_visited": ["agent/cell.visited", "environment/agent/cell.visited"],
+    }
+    for metric_name, keys in GAME_METRIC_KEYS.items():
+        for stats in [eval_stats, train_stats]:
+            for key in keys:
+                if key in stats:
+                    val = stats[key]
+                    if isinstance(val, (list, tuple)):
+                        game_metrics[metric_name] = sum(float(v) for v in val) / len(val) if val else 0.0
+                    else:
+                        game_metrics[metric_name] = float(val)
+                    break
+            if game_metrics[metric_name] != 0.0:
+                break
+
     # Composite score
     composite_score = compute_composite_score(mean_reward)
 
@@ -364,6 +406,11 @@ def main():
     print(f"mission:          {MISSION}")
     print(f"policy:           {POLICY}")
     print(f"reward_variants:  {','.join(REWARD_VARIANTS)}")
+    print(f"junctions_held:   {game_metrics['junctions_held']:.1f}")
+    print(f"junctions_aligned: {game_metrics['junctions_aligned']:.1f}")
+    print(f"junctions_scrambled: {game_metrics['junctions_scrambled']:.1f}")
+    print(f"carbon_deposited: {game_metrics['carbon_deposited']:.1f}")
+    print(f"cells_visited:    {game_metrics['cells_visited']:.1f}")
 
     # ---------------------------------------------------------------------------
     # Log to results.tsv
@@ -374,7 +421,12 @@ def main():
     status = "keep" if composite_score > 0 else "crash" if returncode != 0 else "keep"
 
     log_to_results_tsv(
-        commit, composite_score, mean_reward, memory_gb, status, DESCRIPTION
+        commit, composite_score, mean_reward, memory_gb, status, DESCRIPTION,
+        junctions_held=game_metrics["junctions_held"],
+        junctions_aligned=game_metrics["junctions_aligned"],
+        junctions_scrambled=game_metrics["junctions_scrambled"],
+        carbon_deposited=game_metrics["carbon_deposited"],
+        cells_visited=game_metrics["cells_visited"],
     )
     print(
         f"\nLogged to results.tsv: {commit} | {composite_score:.6f} | {status} | {DESCRIPTION}"
