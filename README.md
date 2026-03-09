@@ -1,6 +1,6 @@
 # cogames-autoresearch
 
-![](https://github.com/SolbiatiAlessandro/cogames-autoresearch/blob/master/progress.png?raw=true)
+![](https://github.com/SolbiatiAlessandro/cogames-autoresearch/blob/main/progress.png?raw=true)
 
 Autonomous RL research on [CoGames](https://github.com/SolbiatiAlessandro/cogames) (Cogs vs Clips) using the [autoresearch](https://github.com/karpathy/autoresearch) pattern.
 
