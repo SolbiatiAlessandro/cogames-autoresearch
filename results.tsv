@@ -1,4 +1,4 @@
-commit	composite_score	mean_reward	memory_gb	status	description	junctions_held	junctions_aligned	junctions_scrambled	carbon_deposited	cells_visited
+commit	composite_score	mean_reward	memory_gb	status	description	cogs_junctions_held	cogs_junctions_aligned	clips_junctions_held	aligned_by_agent	scrambled_by_agent	cells_visited	deaths	move_success	move_failed	vibe_changes	carbon_deposited	carbon_amount	oxygen_amount	silicon_amount	germanium_amount	heart_amount	miner_gained	aligner_gained	scrambler_gained	scout_gained
 ee360ae	0.000000	0.000000	0.000	crash	milestones_2 baseline
 83479bb	0.000000	0.000000	0.000	crash	milestones_2 baseline
 e107db6	0.000000	0.000000	0.000	crash	milestones_2 baseline

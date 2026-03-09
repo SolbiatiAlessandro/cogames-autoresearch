@@ -206,12 +206,13 @@ def get_commit_hash():
 
 def log_to_results_tsv(
     commit, composite_score, mean_reward, memory_gb, status, description,
-    junctions_held=0, junctions_aligned=0, junctions_scrambled=0,
-    carbon_deposited=0, cells_visited=0,
+    game_metrics=None,
 ):
     """Append a row to results.tsv, creating the file with header if needed."""
     tsv_path = "results.tsv"
     write_header = not os.path.exists(tsv_path)
+    if game_metrics is None:
+        game_metrics = {}
 
     with open(tsv_path, "a", newline="") as f:
         writer = csv.writer(f, delimiter="\t")
@@ -224,12 +225,8 @@ def log_to_results_tsv(
                     "memory_gb",
                     "status",
                     "description",
-                    "junctions_held",
-                    "junctions_aligned",
-                    "junctions_scrambled",
-                    "carbon_deposited",
-                    "cells_visited",
                 ]
+                + list(game_metrics.keys())
             )
         writer.writerow(
             [
@@ -239,12 +236,8 @@ def log_to_results_tsv(
                 f"{memory_gb:.3f}",
                 status,
                 description,
-                f"{junctions_held:.1f}",
-                f"{junctions_aligned:.1f}",
-                f"{junctions_scrambled:.1f}",
-                f"{carbon_deposited:.1f}",
-                f"{cells_visited:.1f}",
             ]
+            + [f"{v:.1f}" for v in game_metrics.values()]
         )
 
 
@@ -345,29 +338,47 @@ def main():
     # ---------------------------------------------------------------------------
     # Game metrics (track actual game performance, not just shaped rewards)
     # ---------------------------------------------------------------------------
-    game_metrics = {
-        "junctions_held": 0.0,
-        "junctions_aligned": 0.0,
-        "junctions_scrambled": 0.0,
-        "carbon_deposited": 0.0,
-        "cells_visited": 0.0,
-    }
+    # All game metrics we want to track — give the researcher full visibility
     GAME_METRIC_KEYS = {
-        "junctions_held": ["game/cogs/aligned.junction.held", "environment/game/cogs/aligned.junction.held"],
-        "junctions_aligned": ["agent/junction.aligned_by_agent", "environment/agent/junction.aligned_by_agent"],
-        "junctions_scrambled": ["agent/junction.scrambled_by_agent", "environment/agent/junction.scrambled_by_agent"],
-        "carbon_deposited": ["game/cogs/carbon.deposited", "environment/game/cogs/carbon.deposited"],
-        "cells_visited": ["agent/cell.visited", "environment/agent/cell.visited"],
+        # === OBJECTIVE (the actual game goal) ===
+        "cogs_junctions_held":       ["game/cogs/aligned.junction.held"],
+        "cogs_junctions_aligned":    ["game/cogs/aligned.junction"],
+        "clips_junctions_held":      ["game/clips/aligned.junction.held"],
+        # === AGENT ACTIONS (are agents doing useful things?) ===
+        "aligned_by_agent":          ["agent/junction.aligned_by_agent"],
+        "scrambled_by_agent":        ["agent/junction.scrambled_by_agent"],
+        "cells_visited":             ["agent/cell.visited"],
+        "deaths":                    ["agent/death"],
+        "move_success":              ["agent/action.move.success"],
+        "move_failed":               ["agent/action.move.failed"],
+        "vibe_changes":              ["agent/action.change_vibe.success"],
+        # === ECONOMY (resource flow) ===
+        "carbon_deposited":          ["game/cogs/carbon.deposited"],
+        "carbon_amount":             ["game/cogs/carbon.amount"],
+        "oxygen_amount":             ["game/cogs/oxygen.amount"],
+        "silicon_amount":            ["game/cogs/silicon.amount"],
+        "germanium_amount":          ["game/cogs/germanium.amount"],
+        "heart_amount":              ["game/cogs/heart.amount"],
+        # === GEAR (specialization happening?) ===
+        "miner_gained":              ["agent/miner.gained"],
+        "aligner_gained":            ["agent/aligner.gained"],
+        "scrambler_gained":          ["agent/scrambler.gained"],
+        "scout_gained":              ["agent/scout.gained"],
     }
+    game_metrics = {k: 0.0 for k in GAME_METRIC_KEYS}
     for metric_name, keys in GAME_METRIC_KEYS.items():
         for stats in [eval_stats, train_stats]:
             for key in keys:
-                if key in stats:
-                    val = stats[key]
-                    if isinstance(val, (list, tuple)):
-                        game_metrics[metric_name] = sum(float(v) for v in val) / len(val) if val else 0.0
-                    else:
-                        game_metrics[metric_name] = float(val)
+                # Also check with environment/ prefix
+                for full_key in [key, f"environment/{key}"]:
+                    if full_key in stats:
+                        val = stats[full_key]
+                        if isinstance(val, (list, tuple)):
+                            game_metrics[metric_name] = sum(float(v) for v in val) / len(val) if val else 0.0
+                        else:
+                            game_metrics[metric_name] = float(val)
+                        break
+                if game_metrics[metric_name] != 0.0:
                     break
             if game_metrics[metric_name] != 0.0:
                 break
@@ -406,11 +417,9 @@ def main():
     print(f"mission:          {MISSION}")
     print(f"policy:           {POLICY}")
     print(f"reward_variants:  {','.join(REWARD_VARIANTS)}")
-    print(f"junctions_held:   {game_metrics['junctions_held']:.1f}")
-    print(f"junctions_aligned: {game_metrics['junctions_aligned']:.1f}")
-    print(f"junctions_scrambled: {game_metrics['junctions_scrambled']:.1f}")
-    print(f"carbon_deposited: {game_metrics['carbon_deposited']:.1f}")
-    print(f"cells_visited:    {game_metrics['cells_visited']:.1f}")
+    print("\n--- Game Metrics ---")
+    for k, v in game_metrics.items():
+        print(f"{k:>25}: {v:.1f}")
 
     # ---------------------------------------------------------------------------
     # Log to results.tsv
@@ -422,11 +431,7 @@ def main():
 
     log_to_results_tsv(
         commit, composite_score, mean_reward, memory_gb, status, DESCRIPTION,
-        junctions_held=game_metrics["junctions_held"],
-        junctions_aligned=game_metrics["junctions_aligned"],
-        junctions_scrambled=game_metrics["junctions_scrambled"],
-        carbon_deposited=game_metrics["carbon_deposited"],
-        cells_visited=game_metrics["cells_visited"],
+        game_metrics=game_metrics,
     )
     print(
         f"\nLogged to results.tsv: {commit} | {composite_score:.6f} | {status} | {DESCRIPTION}"

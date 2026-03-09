@@ -139,17 +139,30 @@ $(cat results.tsv 2>/dev/null || echo 'no results yet')
 === CURRENT BEST SCORE: ${BEST_SCORE} ===
 
 === ⚠️ REWARD HACKING WARNING ===
-The composite_score is the sum of ALL shaped rewards (milestones, credit, scout, etc.).
-A high composite_score does NOT mean agents are winning the game.
-results.tsv now tracks 5 game metrics that measure ACTUAL game performance:
-  - junctions_held: cumulative junctions held by our team (THE game objective)
-  - junctions_aligned: junctions we captured
-  - junctions_scrambled: enemy junctions disrupted
-  - carbon_deposited: resources deposited at hub (productive mining)
-  - cells_visited: exploration coverage
-When evaluating experiments, look at BOTH composite_score AND these game metrics.
-An experiment that increases composite_score but has 0 junctions_held is reward hacking.
-Prefer experiments that improve the actual game metrics, even at lower composite_score.
+composite_score is the sum of ALL shaped rewards — it does NOT mean agents are winning.
+The current best (234) has ZERO junctions held. Agents are just farming easy rewards.
+
+results.tsv now tracks 20 game metrics alongside composite_score. Key ones:
+
+OBJECTIVE (the actual game — are we winning?):
+  - cogs_junctions_held: junctions held by our team (THE objective, currently 0!)
+  - cogs_junctions_aligned: junctions we captured
+  - clips_junctions_held: junctions held by enemy (currently ~1.2M — they own everything)
+
+AGENT BEHAVIOR (are agents doing anything useful?):
+  - aligned_by_agent / scrambled_by_agent: territory actions (currently 0!)
+  - cells_visited, deaths, move_success/failed, vibe_changes
+
+ECONOMY (resource flow):
+  - carbon/oxygen/silicon/germanium_amount, carbon_deposited, heart_amount
+
+GEAR (is specialization happening?):
+  - miner/aligner/scrambler/scout_gained
+
+After each run, grep the game metrics from run.log. Look at the full picture.
+Pick the metric that looks most promising to improve — maybe it's getting agents
+to actually align junctions, or pick up gear, or deposit resources.
+Prioritize experiments that move the GAME metrics, not just composite_score.
 
 === YOUR TASK: Run ONE complete experiment iteration ===
 
