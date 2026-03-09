@@ -206,7 +206,7 @@ def get_commit_hash():
 
 def log_to_results_tsv(
     commit, composite_score, mean_reward, memory_gb, status, description,
-    game_metrics=None,
+    game_metrics=None, e2e_seconds=0.0, api_cost_usd=0.0,
 ):
     """Append a row to results.tsv, creating the file with header if needed."""
     tsv_path = "results.tsv"
@@ -225,6 +225,8 @@ def log_to_results_tsv(
                     "memory_gb",
                     "status",
                     "description",
+                    "e2e_seconds",
+                    "api_cost_usd",
                 ]
                 + list(game_metrics.keys())
             )
@@ -236,6 +238,8 @@ def log_to_results_tsv(
                 f"{memory_gb:.3f}",
                 status,
                 description,
+                f"{e2e_seconds:.0f}",
+                f"{api_cost_usd:.4f}",
             ]
             + [f"{v:.1f}" for v in game_metrics.values()]
         )
@@ -243,6 +247,8 @@ def log_to_results_tsv(
 
 def main():
     t_start = time.time()
+
+    experiment_start_time = time.time()
 
     print("=" * 60)
     print("CoGames Autoresearch Training")
@@ -428,10 +434,26 @@ def main():
     commit = get_commit_hash()
     memory_gb = peak_vram_mb / 1024.0
     status = "keep" if composite_score > 0 else "crash" if returncode != 0 else "keep"
+    e2e_seconds = time.time() - experiment_start_time
+
+    # Estimate API cost from a cost file written by the loop (if available)
+    api_cost_usd = 0.0
+    cost_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".experiment_cost")
+    if os.path.exists(cost_file):
+        try:
+            api_cost_usd = float(open(cost_file).read().strip())
+            os.remove(cost_file)
+        except Exception:
+            pass
+
+    print(f"e2e_seconds:      {e2e_seconds:.1f}")
+    print(f"api_cost_usd:     ${api_cost_usd:.4f}")
 
     log_to_results_tsv(
         commit, composite_score, mean_reward, memory_gb, status, DESCRIPTION,
         game_metrics=game_metrics,
+        e2e_seconds=e2e_seconds,
+        api_cost_usd=api_cost_usd,
     )
     print(
         f"\nLogged to results.tsv: {commit} | {composite_score:.6f} | {status} | {DESCRIPTION}"

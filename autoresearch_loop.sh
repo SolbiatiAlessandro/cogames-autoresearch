@@ -191,12 +191,29 @@ Follow program.md exactly. Summary of the loop:
 DO NOT stop, DO NOT ask questions. Run the full experiment end-to-end."
 
     log "Spawning Claude Code for experiment #$experiment_count (timeout: ${AGENT_TIMEOUT}s)..."
+    EXPERIMENT_START=$(date +%s)
 
     AGENT_OUTPUT=$(cd "$REPO" && perl -e "alarm($AGENT_TIMEOUT); exec @ARGV" -- "$CLAUDE_BIN" \
         --dangerously-skip-permissions \
         --print \
         "$PROMPT" \
         2>&1) || AGENT_EXIT=$?
+
+    EXPERIMENT_END=$(date +%s)
+    EXPERIMENT_ELAPSED=$(( EXPERIMENT_END - EXPERIMENT_START ))
+
+    # Estimate API cost from token counts in Claude output (rough heuristic)
+    # Claude Code prints token usage at end: "Tokens: Xk in / Yk out"
+    INPUT_KTOK=$(echo "$AGENT_OUTPUT" | grep -oE "[0-9]+(\.[0-9]+)?k in" | grep -oE "[0-9]+(\.[0-9]+)?" | tail -1 || echo "0")
+    OUTPUT_KTOK=$(echo "$AGENT_OUTPUT" | grep -oE "[0-9]+(\.[0-9]+)?k out" | grep -oE "[0-9]+(\.[0-9]+)?" | tail -1 || echo "0")
+    API_COST=$(python3 -c "
+in_tok = float('${INPUT_KTOK}' or 0) * 1000
+out_tok = float('${OUTPUT_KTOK}' or 0) * 1000
+cost = (in_tok / 1_000_000 * 3.0) + (out_tok / 1_000_000 * 15.0)
+print(f'{cost:.4f}')
+" 2>/dev/null || echo "0.0000")
+    echo "$API_COST" > "$REPO/.experiment_cost"
+    log "Experiment #$experiment_count took ${EXPERIMENT_ELAPSED}s, estimated cost: \$${API_COST}"
 
     log "--- Agent output (last 50 lines) ---"
     echo "$AGENT_OUTPUT" | tail -50 >> "$LOG"
