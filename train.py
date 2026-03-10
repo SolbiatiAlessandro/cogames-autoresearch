@@ -20,7 +20,7 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
-TIME_BUDGET = 300  # 5-minute experiments for rapid iteration
+TIME_BUDGET = 600  # 10-minute experiments — sweet spot between fast and farming
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -45,7 +45,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout + aligner ent_coef=0.05 vf_coef=4.0 bptt=128 — longer memory for resource planning"
+DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout + aligner ent_coef=0.05 vf_coef=4.0 bptt=128 10min — sweet spot budget"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
