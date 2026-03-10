@@ -30,8 +30,8 @@ REWARD_VARIANTS = ["milestones", "role_conditional", "penalize_vibe_change"]  # 
 NUM_AGENTS = 4
 
 # Policy
-POLICY = "class=lstm"  # options: lstm, baseline, stateless, or custom class path
 HIDDEN_SIZE = 256
+POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
 LEARNING_RATE = 0.001
