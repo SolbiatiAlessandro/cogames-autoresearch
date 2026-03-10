@@ -27,7 +27,7 @@ TIME_BUDGET = 300  # 5-minute experiments for rapid iteration
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2", "role_conditional", "penalize_vibe_change", "miner"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2", "role_conditional", "penalize_vibe_change", "miner", "scout"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -45,7 +45,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner ent_coef=0.05 vf_coef=4.0 — MAPPO stronger critic + exploration"
+DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout ent_coef=0.05 vf_coef=4.0 — carbon deposit combo + scout"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
