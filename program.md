@@ -2,33 +2,47 @@
 
 Autonomous RL research on CoGames (Cogs vs Clips). You are a fully autonomous researcher. There is no human to talk to. You will not receive replies. You run experiments in a loop until you are interrupted.
 
-The human starts you with a message like: `branch: mar10-anti-farming | direction: remove credit and scout, focus on milestones_2 with caps to prevent reward hacking`. That message is your research brief. The branch name and the direction guide your experiments for the entire session.
+The human starts you with a message like:
+
+```
+branch: mar10-anti-farming | direction: remove credit and scout, focus on milestones_2 with caps to prevent reward hacking | time_budget: 600
+```
+
+That message is your research brief:
+- **branch** — the name for your experiment branch
+- **direction** — what to explore in this session
+- **time_budget** — seconds per experiment (default 600). Set this in train.py by overriding `TIME_BUDGET`.
 
 ## Setup (do this ONCE at the start)
 
-1. **Parse the human's starting message** for the branch name and research direction. These are your instructions for the session.
-2. **Create the branch**: `git checkout -b autoresearch/<branch_name>` from current main.
-3. **Read prior session reports from GitHub Discussions**:
+1. **Parse the human's starting message** for branch, direction, and time_budget.
+2. **Create the branch**: `git checkout -b autoresearch/<branch>` from current main.
+3. **Set TIME_BUDGET** in train.py if the human specified a non-default time_budget:
+   ```python
+   import prepare; prepare.TIME_BUDGET = <time_budget>
+   ```
+   If you change TIME_BUDGET, also adjust the learning rate — the default LR schedule decays to near-zero at 600s. For longer runs, increase the base LR proportionally.
+4. **Read prior session reports from GitHub Discussions**:
    ```bash
    gh api graphql -f query='{ repository(owner:"SolbiatiAlessandro", name:"cogames-autoresearch") { discussions(first:20, orderBy:{field:CREATED_AT, direction:DESC}) { nodes { number title body } } } }' -q '.data.repository.discussions.nodes[] | "## #\(.number): \(.title)\n\(.body)\n---"'
    ```
    Each discussion is a session report from a prior run with findings, dead ends, and ideas. Read ALL of them. Build on their insights. Don't repeat their mistakes.
-4. **Read the repo files**:
+5. **Read the repo files**:
    - `prepare.py` — fixed evaluation harness. **Do not modify.**
    - `train.py` — the ONE file you edit.
    - `knowledge/` — domain context, reward variant docs, `findings.md`.
    - `results/` — per-session results files from prior runs.
-5. **Verify cogames is installed**: `uv run python -c "import cogames; print('ok')"`. If not: `uv pip install -e ~/Projects/cogames`
-6. **Create a GitHub Discussion** for this session:
+6. **Verify cogames is installed**: `uv run python -c "import cogames; print('ok')"`. If not: `uv pip install -e ~/Projects/cogames`
+7. **Create a GitHub Discussion** for this session:
    ```bash
    gh discussion create --repo SolbiatiAlessandro/cogames-autoresearch \
      --category "Show and tell" \
-     --title "Session <branch_name> — $(date '+%b %-d, %Y')" \
-     --body "<starting context: direction, what you read from prior discussions, your plan>"
+     --title "Session <branch> — $(date '+%b %-d, %Y')" \
+     --body "<starting context: direction, what you learned from prior discussions, your plan>"
    ```
-   This discussion is your session log. It will be read by future sessions.
-7. **Initialize results.tsv** with the header row (see Logging section).
-8. **Start the experiment loop.**
+   This discussion is your session log. Future sessions will read it.
+8. **Initialize results.tsv** with the header row (see Logging section).
+9. **Start the experiment loop.**
 
 ## The experiment loop
 
@@ -47,8 +61,8 @@ LOOP FOREVER:
    - Genuine game progress (junctions held, aligned_by_agent > 0) → **keep**
    - Score up but game metrics flat/zero → reward hacking → **discard** + `git reset --hard HEAD~1`
    - Equal or worse → **discard** + `git reset --hard HEAD~1`
-8. **Push**: `git push -u origin autoresearch/<branch_name>`
-9. **Update the GitHub Discussion** if you made an interesting finding (not every experiment — only when something noteworthy happened: a breakthrough, a surprising failure, a new insight). Keep the discussion concise and useful for future sessions.
+8. **Push**: `git push -u origin autoresearch/<branch>`
+9. **Update the GitHub Discussion** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions.
 10. Go to 1.
 
 **NEVER STOP.** Do not pause to ask questions. There is no human listening. You are autonomous. If you run out of ideas, re-read the GitHub Discussions and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human kills your process.
@@ -92,14 +106,6 @@ commit	composite_score	mean_reward	memory_gb	status	description	timestamp	e2e_se
 Include: (1) what you changed, (2) game metrics summary, (3) your assessment.
 
 Example: `experiment: milestones_2 + role_conditional — junctions_held=500, aligned=3, real progress`
-
-## Training time
-
-Default TIME_BUDGET is 600s (10 min). Override in train.py:
-```python
-import prepare; prepare.TIME_BUDGET = 1200  # 20 min
-```
-**If you increase TIME_BUDGET, also increase the learning rate** — the default LR schedule decays to near-zero at 600s.
 
 ## Checkpoints
 
