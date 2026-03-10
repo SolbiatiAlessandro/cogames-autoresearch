@@ -9,3 +9,8 @@ train_dir/
 *.pt
 *.safetensors
 uv.lock
+autoresearch_loop.log
+autoresearch_loop.pid
+watchdog.log
+.experiment_cost
+.notion_synced_commits

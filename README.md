@@ -4,17 +4,29 @@
 
 Autonomous RL research on [CoGames](https://github.com/SolbiatiAlessandro/cogames) (Cogs vs Clips) using the [autoresearch](https://github.com/karpathy/autoresearch) pattern.
 
-## How it works
+## Start a session
 
-An AI agent (Claude Code / OpenCode) runs in an infinite loop:
+```bash
+cd ~/Projects/cogames-autoresearch
+claude --dangerously-skip-permissions
+# then type: Follow program.md
+```
+
+That's it. Claude Code reads `program.md`, sets up a branch, reads prior session reports from [GitHub Discussions](https://github.com/SolbiatiAlessandro/cogames-autoresearch/discussions), and loops forever running experiments. Walk away, come back to results.
+
+If the session dies (context window, crash), start a new one — it picks up from git log + results.tsv.
+
+## How it works
 
 1. Edit `train.py` with an experimental idea
 2. `git commit`
 3. `uv run train.py > run.log 2>&1` (10-minute time budget)
-4. Check results: `grep "^composite_score:" run.log`
-5. If improved → keep. If not → `git reset --hard HEAD~1`
-6. Log to `results.tsv`
+4. Check composite score AND game metrics (junctions held, agents aligning)
+5. If genuine progress → keep. If reward hacking or worse → `git reset --hard HEAD~1`
+6. Log to `results.tsv` (28 columns including 20 game metrics)
 7. Repeat forever
+
+Session reports are posted to [GitHub Discussions](https://github.com/SolbiatiAlessandro/cogames-autoresearch/discussions) — each session reads prior ones to build on past findings.
 
 ## File structure
 
@@ -24,41 +36,21 @@ cogames-autoresearch/
 ├── train.py            # AGENT EDITS: policy, hyperparams, reward variants, training loop
 ├── program.md          # HUMAN EDITS: research instructions, what to try/avoid
 ├── results.tsv         # Experiment log (auto-managed by agent)
-├── knowledge/          # Paper summaries, domain context (agent reads for ideas)
+├── results/            # Per-session results (results_mar7.tsv, etc.)
+├── knowledge/          # Paper summaries, domain context, findings from prior sessions
 │   ├── cogames_overview.md
+│   ├── findings.md
 │   ├── reward_variants.md
 │   └── training_tips.md
-└── README.md           # This file
-```
-
-## Quick start
-
-```bash
-# Prerequisites: cogames installed (pip install cogames or from ../cogames)
-uv sync
-
-# Run one training experiment manually
-uv run train.py
-
-# Start the autonomous loop (point Claude Code at program.md)
-# Or use Ralph Loop for overnight runs
+└── checkpoints/        # Archived model checkpoints per experiment
 ```
 
 ## Prerequisites
 
 - Python 3.12
-- cogames package (from `../cogames` or PyPI)
-- GPU recommended (CUDA), CPU works but slow
-- For autonomous loop: Claude Code CLI or OpenCode
-
-## Research directions
-
-See `knowledge/` for domain context and `program.md` for the full experiment protocol.
-
-Current focus areas:
-1. **Reward shaping**: Which reward variants produce the best coordination?
-2. **Architecture**: Does network size / LSTM matter for role specialization?
-3. **Intrinsic rewards**: Can social influence or phase synchronization bootstrap coordination?
+- cogames package (`uv pip install -e ~/Projects/cogames`)
+- GPU recommended (CUDA/MPS), CPU works but slow
+- Claude Code CLI (`claude`)
 
 ## Credits
 
