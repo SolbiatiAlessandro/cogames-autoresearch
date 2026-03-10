@@ -76,13 +76,24 @@ Extract the key metric: `grep "^composite_score:" run.log`
 
 ## Logging results
 
-Log to `results.tsv` (tab-separated). The file has 28 columns including game metrics:
+Log to `results.tsv` (tab-separated). train.py auto-appends most columns. **After each experiment, you MUST also manually update or verify these columns:**
+
+### Cost & timing columns (YOU fill these in)
+
+After each experiment, append or fix these values in the results.tsv row:
+
+- **`timestamp`** — ISO 8601 timestamp when the experiment finished (e.g. `2026-03-10T03:45:00`). Use: `date -Iseconds`
+- **`session_tokens_cumulative`** — total tokens used by YOU (the Claude Code agent) so far in this session. Check your token usage with `/cost` and log the cumulative total.
+- **`session_cost_cumulative`** — estimated total dollar cost of this Claude Code session so far. Use Sonnet pricing: $3/M input, $15/M output. Log the running total.
+- **`e2e_seconds`** — wall-clock seconds for this experiment (training + your thinking time). train.py logs the training time; add your overhead.
+
+### Full column list
 
 ```
-commit	composite_score	mean_reward	memory_gb	status	description	e2e_seconds	api_cost_usd	cogs_junctions_held	cogs_junctions_aligned	clips_junctions_held	aligned_by_agent	scrambled_by_agent	cells_visited	deaths	move_success	move_failed	vibe_changes	carbon_deposited	carbon_amount	oxygen_amount	silicon_amount	germanium_amount	heart_amount	miner_gained	aligner_gained	scrambler_gained	scout_gained
+commit	composite_score	mean_reward	memory_gb	status	description	timestamp	e2e_seconds	session_tokens_cumulative	session_cost_cumulative	cogs_junctions_held	cogs_junctions_aligned	clips_junctions_held	aligned_by_agent	scrambled_by_agent	cells_visited	deaths	move_success	move_failed	vibe_changes	carbon_deposited	carbon_amount	oxygen_amount	silicon_amount	germanium_amount	heart_amount	miner_gained	aligner_gained	scrambler_gained	scout_gained
 ```
 
-**ALL columns must be populated.** train.py logs them automatically — verify they appear in run.log output. If game metrics are all 0.0, something is wrong with metric extraction.
+**ALL columns must be populated.** train.py logs game metrics automatically — verify they appear in run.log output. If game metrics are all 0.0, something is wrong with metric extraction. The cost/timing columns are YOUR responsibility.
 
 - `keep` = experiment shows genuine progress (check game metrics, not just score)
 - `discard` = no improvement or reward hacking (also `git reset --hard HEAD~1`)
@@ -111,7 +122,7 @@ LOOP FOREVER:
 8. Read results: `grep "^composite_score:\|^mean_reward:" run.log`
 9. **Check game metrics**: `grep -A20 "Game Metrics" run.log` — are agents actually playing?
 10. If empty: run crashed. `tail -50 run.log` for the traceback. Fix and retry.
-11. Log to results.tsv (train.py does this automatically)
+11. Log to results.tsv — train.py writes most columns, **you fill in timestamp, session_tokens_cumulative, session_cost_cumulative**
 12. If experiment shows **genuine game progress** (higher junctions_held, aligned_by_agent > 0): keep
 13. If score went up but game metrics are flat/zero: this is reward hacking, discard
 14. If equal or worse on both score AND game metrics: `git reset --hard HEAD~1`
