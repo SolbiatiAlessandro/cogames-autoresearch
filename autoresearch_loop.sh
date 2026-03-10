@@ -20,59 +20,13 @@ CLAUDE_BIN="$HOME/.local/bin/claude"
 WHATSAPP_NUMBER="+12065321138"
 CHECKPOINT_DIR="$REPO/checkpoints"
 RESULTS_DIR="$REPO/results"
-DISCUSSIONS_DIR="$REPO/discussions"
 GH_REPO="SolbiatiAlessandro/cogames-autoresearch"
 GH_DISCUSSION_CATEGORY="DIC_kwDORhT1Bs4C3_6L"  # "Show and tell"
 
 AGENT_TIMEOUT=2400
 
 cd "$REPO"
-mkdir -p "$CHECKPOINT_DIR" "$RESULTS_DIR" "$DISCUSSIONS_DIR"
-
-# =========================================================================
-# Sync discussions from GitHub (so agent can read prior session reports)
-# =========================================================================
-
-sync_discussions() {
-    log "Syncing discussions from GitHub..."
-    gh api graphql -f query='
-    {
-      repository(owner: "SolbiatiAlessandro", name: "cogames-autoresearch") {
-        discussions(first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-            number
-            title
-            body
-            createdAt
-            url
-          }
-        }
-      }
-    }' 2>/dev/null | python3 -c "
-import json, sys, re, os
-data = json.load(sys.stdin)
-discussions_dir = '$DISCUSSIONS_DIR'
-os.makedirs(discussions_dir, exist_ok=True)
-for d in data['data']['repository']['discussions']['nodes']:
-    num = d['number']
-    title = d['title']
-    body = d['body']
-    created = d['createdAt'][:10]
-    url = d['url']
-    slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:60]
-    filename = os.path.join(discussions_dir, f'{num:03d}-{slug}.md')
-    with open(filename, 'w') as f:
-        f.write(f'# {title}\n\n')
-        f.write(f'**Discussion:** {url}\n')
-        f.write(f'**Created:** {created}\n\n')
-        f.write(body)
-    print(f'  Synced: {filename}', file=sys.stderr)
-" 2>&1 | while read line; do log "$line"; done
-    log "Discussions synced."
-}
-
-# Sync prior session discussions from GitHub
-sync_discussions
+mkdir -p "$CHECKPOINT_DIR" "$RESULTS_DIR"
 
 # =========================================================================
 # Session setup: create a fresh branch (Karpathy pattern)
@@ -103,8 +57,7 @@ git checkout -b "$BRANCH"
 # Initialize session results file with header
 echo -e "commit\tcomposite_score\tmean_reward\tmemory_gb\tstatus\tdescription\te2e_seconds\tapi_cost_usd\tcogs_junctions_held\tcogs_junctions_aligned\tclips_junctions_held\taligned_by_agent\tscrambled_by_agent\tcells_visited\tdeaths\tmove_success\tmove_failed\tvibe_changes\tcarbon_deposited\tcarbon_amount\toxygen_amount\tsilicon_amount\tgermanium_amount\theart_amount\tminer_gained\taligner_gained\tscrambler_gained\tscout_gained" > "$RESULTS_FILE"
 
-# Also create/update the working results.tsv (what train.py writes to)
-# Copy from results file so train.py appends here, then we sync back
+# Also create the working results.tsv
 cp "$RESULTS_FILE" "$REPO/results.tsv"
 
 # =========================================================================
@@ -173,7 +126,6 @@ get_best_score() {
 }
 
 sync_results() {
-    # Sync working results.tsv → session results file
     cp "$REPO/results.tsv" "$RESULTS_FILE"
 }
 
@@ -185,7 +137,6 @@ DISCUSSION_URL=""
 DISCUSSION_NODE_ID=""
 
 get_starting_context() {
-    # Build the "starting from" context for the discussion
     local prev_best
     prev_best=$(tail -n+2 "$REPO/results.tsv" 2>/dev/null | sort -t$'\t' -k2 -rn | head -1 | cut -f6)
     local prev_score
@@ -218,7 +169,6 @@ create_discussion() {
     body=$(get_starting_context)
     local title="Session $RUN_TAG — $(date '+%b %-d, %Y')"
 
-    # Create discussion via GraphQL
     local repo_id
     repo_id=$(gh api graphql -f query="{ repository(owner:\"SolbiatiAlessandro\", name:\"cogames-autoresearch\") { id } }" -q '.data.repository.id')
 
@@ -243,30 +193,20 @@ mutation {
 
     if [[ -n "$DISCUSSION_URL" ]]; then
         log "Created discussion: $DISCUSSION_URL"
-        # Save this session's discussion to the discussions folder
-        local disc_num
-        disc_num=$(echo "$DISCUSSION_URL" | grep -oE '[0-9]+$' || echo "0")
-        local disc_slug
-        disc_slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g' | head -c 60)
-        local disc_file="$DISCUSSIONS_DIR/$(printf '%03d' "$disc_num")-${disc_slug}.md"
-        echo -e "# $title\n\n**Discussion:** $DISCUSSION_URL\n**Created:** $(date '+%Y-%m-%d')\n\n$body" > "$disc_file"
-        git add "$disc_file" 2>/dev/null || true
     else
         log "Failed to create discussion (non-critical, continuing)"
     fi
 }
 
 update_discussion_body() {
-    # Rebuild the full discussion body with current experiment table
     [[ -z "$DISCUSSION_NODE_ID" ]] && return
 
     local body
     body=$(get_starting_context)
 
-    # Append experiment rows from this session's results
     local exp_num=0
     while IFS=$'\t' read -r commit score mean_reward mem status desc e2e cost jh ja ch aa sa rest; do
-        [[ "$commit" == "commit" ]] && continue  # skip header
+        [[ "$commit" == "commit" ]] && continue
         exp_num=$((exp_num + 1))
         body+="| $exp_num | $score | ${jh:-?} | ${aa:-?} | $status | $desc |
 "
@@ -354,22 +294,22 @@ $(cat results.tsv 2>/dev/null || echo 'no results yet')
 
 === YOUR TASK: Run ONE complete experiment iteration ===
 
-Follow program.md exactly — READ IT FIRST, especially the 'What Has Been Tried' and
-'What Better Means' sections. Also read knowledge/findings.md for reward hacking analysis.
+Follow program.md exactly — READ IT FIRST. In particular:
+1. **Read prior session reports from GitHub Discussions** (see the gh api command in program.md Setup step 3). These contain findings, dead ends, and ideas from previous runs. DO NOT skip this.
+2. Read knowledge/findings.md for reward hacking analysis
+3. Read knowledge/ for domain context
+4. Focus on GAME METRICS (cogs_junctions_held, aligned_by_agent), not just composite_score
 
-Summary of the loop:
-1. Read program.md and ALL files in knowledge/ (especially findings.md)
-2. Look at results above — pick ONE new experiment idea NOT already tried
-3. Focus on GAME METRICS (cogs_junctions_held, aligned_by_agent), not just composite_score
-4. Modify train.py (ONLY this file)
-5. git add train.py && git commit -m 'experiment: <description> — <game metrics summary>'
-6. Run: uv run train.py > run.log 2>&1 (WAIT for completion)
-7. Check results: grep '^composite_score:\|^mean_reward:' run.log
-8. Check game metrics: grep -A20 'Game Metrics' run.log
-9. If crash: tail -50 run.log, fix train.py, retry up to 2 times
-10. Log to results.tsv (train.py does this automatically)
-11. If genuine game progress: KEEP commit. If reward hacking or worse: git reset --hard HEAD~1
-12. End your response with exactly one of:
+Then:
+5. Modify train.py (ONLY this file)
+6. git add train.py && git commit -m 'experiment: <description> — <game metrics summary>'
+7. Run: uv run train.py > run.log 2>&1 (WAIT for completion)
+8. Check results: grep '^composite_score:\|^mean_reward:' run.log
+9. Check game metrics: grep -A20 'Game Metrics' run.log
+10. If crash: tail -50 run.log, fix train.py, retry up to 2 times
+11. Log to results.tsv (train.py does this automatically)
+12. If genuine game progress: KEEP commit. If reward hacking or worse: git reset --hard HEAD~1
+13. End your response with exactly one of:
     EXPERIMENT_DONE: score=<score> status=keep|discard|crash description=<what you tried>
     CRITICALLY_BLOCKED: <reason>
 

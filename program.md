@@ -8,16 +8,20 @@ To set up a new experiment session:
 
 1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar7`). The branch `autoresearch/<tag>` must not already exist.
 2. **Create the branch**: `git checkout -b autoresearch/<tag>` from current main.
-3. **Read the in-scope files**: The repo is small. Read these files for full context:
+3. **Read prior session reports from GitHub Discussions**:
+   ```bash
+   gh api graphql -f query='{ repository(owner:"SolbiatiAlessandro", name:"cogames-autoresearch") { discussions(first:20, orderBy:{field:CREATED_AT, direction:DESC}) { nodes { number title body } } } }' -q '.data.repository.discussions.nodes[] | "## #\(.number): \(.title)\n\(.body)\n---"'
+   ```
+   **This is the most important context.** Each discussion is a session report from a prior run — it contains findings, dead ends, and next-step ideas. Read ALL of them. Build on their insights, don't repeat their mistakes.
+4. **Read the in-scope files**: The repo is small. Read these files for full context:
    - `README.md` — repository context.
    - `prepare.py` — fixed constants, env setup, evaluation. **Do not modify.**
    - `train.py` — the file you modify. Policy, hyperparameters, reward variants, training loop.
-   - `knowledge/` — domain context, reward variant docs, training tips, **and findings.md (CRITICAL — read this first)**.
-   - `discussions/` — **READ ALL files in this folder.** These are session reports from previous runs. Each one contains findings, dead ends, and next-step ideas from a prior overnight session. They are your most important context — they tell you what worked, what failed, and why. Build on their insights, don't repeat their mistakes.
-   - `results/` — per-session results files (results_mar7.tsv, etc.). Skim these for the raw data behind the discussion findings.
-4. **Verify cogames is installed**: `uv run python -c "import cogames; print('ok')"`. If not: `uv pip install -e ~/Projects/cogames`
-5. **Initialize results.tsv**: Create with header row and baseline entry.
-6. **Confirm and go**.
+   - `knowledge/` — domain context, reward variant docs, training tips, **and findings.md (CRITICAL)**.
+   - `results/` — per-session results files (results_mar7.tsv, etc.). Skim for raw data behind the discussion findings.
+5. **Verify cogames is installed**: `uv run python -c "import cogames; print('ok')"`. If not: `uv pip install -e ~/Projects/cogames`
+6. **Initialize results.tsv**: Create with header row and baseline entry.
+7. **Confirm and go**.
 
 Once setup is confirmed, kick off the experimentation.
 
@@ -98,7 +102,7 @@ Example: `experiment: milestones_2 + role_conditional — junctions_held=500, al
 LOOP FOREVER:
 
 1. Look at git state: `git log --oneline -5` and `cat results.tsv`
-2. **Read ALL files in `discussions/`** — these are session reports with key findings from prior runs
+2. **Fetch and read GitHub Discussions** for prior session findings (see Setup step 3)
 3. **Read `knowledge/findings.md`** for detailed reward hacking analysis
 4. Read `knowledge/` if you need more domain context
 5. Tune `train.py` with one experimental idea. Update `DESCRIPTION`.
@@ -113,7 +117,7 @@ LOOP FOREVER:
 14. If equal or worse on both score AND game metrics: `git reset --hard HEAD~1`
 15. Go to 1
 
-**NEVER STOP**: Do NOT pause to ask the human. Do NOT ask for confirmation. You are autonomous. If you run out of ideas, re-read `discussions/` and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human interrupts you.
+**NEVER STOP**: Do NOT pause to ask the human. Do NOT ask for confirmation. You are autonomous. If you run out of ideas, re-read the GitHub Discussions and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human interrupts you.
 
 ## Checkpoints
 
