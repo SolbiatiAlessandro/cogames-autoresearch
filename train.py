@@ -45,7 +45,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout + aligner ent_coef=0.05 vf_coef=4.0 — target aligned_by_agent"
+DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout + aligner ent_coef=0.08 vf_coef=4.0 — more exploration for junction alignment"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -79,7 +79,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
-        train_args['ent_coef'] = 0.05
+        train_args['ent_coef'] = 0.08
         train_args['vf_coef'] = 4.0
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
