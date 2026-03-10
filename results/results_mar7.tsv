@@ -1,0 +1,57 @@
+commit	composite_score	mean_reward	memory_gb	status	description	e2e_seconds	api_cost_usd	cogs_junctions_held	cogs_junctions_aligned	clips_junctions_held	aligned_by_agent	scrambled_by_agent	cells_visited	deaths	move_success	move_failed	vibe_changes	carbon_deposited	carbon_amount	oxygen_amount	silicon_amount	germanium_amount	heart_amount	miner_gained	aligner_gained	scrambler_gained	scout_gained
+ee360ae	0.000000	0.000000	0.000	crash	milestones_2 baseline
+83479bb	0.000000	0.000000	0.000	crash	milestones_2 baseline
+e107db6	0.000000	0.000000	0.000	crash	milestones_2 baseline
+0198a04	0.498750	0.498750	0.000	keep	milestones_2 baseline
+ac95561	0.048000	0.048000	0.000	keep	milestones_2:25 compounding factor
+f88dfe1	-0.539687	-0.539687	0.000	crash	milestones_2 + credit (dense bootstrap)
+62f1509	0.231389	0.231389	0.000	keep	milestones_2 ent_coef=0.05
+3c0de34	0.048500	0.048500	0.000	keep	milestones_2:10 compounding
+9a52625	0.025312	0.025312	0.000	keep	milestones_2 minibatch=2048
+40671f8	0.073875	0.073875	0.000	keep	milestones_2 stateless policy
+70dd9bb	0.946045	0.946045	0.000	keep	milestones (no compounding)
+3c84727	0.056500	0.056500	0.000	keep	milestones + milestones_2 stacked
+940746e	0.865931	0.865931	0.000	keep	milestones + penalize_vibe_change
+d509d84	0.862031	0.862031	0.000	keep	milestones lr=0.002
+d8e48ff	0.967782	0.967782	0.000	keep	milestones minibatch=8192
+12fde24	1.045807	1.045807	0.000	keep	milestones minibatch=8192 lr=0.001
+bfb3785	0.970249	0.970249	0.000	keep	milestones minibatch=8192 lr=0.0015
+cde8255	1.000053	1.000053	0.000	keep	milestones minibatch=16384 lr=0.001
+42f6fc1	0.969749	0.969749	0.000	keep	milestones mb=8192 lr=0.001 gamma=0.999 gae=0.95
+71c0b4e	0.879180	0.879180	0.000	keep	milestones mb=8192 lr=0.001 epochs=2
+f5851b9	1.000053	1.000053	0.000	keep	milestones mb=8192 lr=0.001 ent=0.005
+a9995c5	1.000053	1.000053	0.000	keep	milestones mb=8192 lr=0.001 clip=0.1
+e238dcb	0.062500	0.062500	0.000	keep	no_objective + milestones mb=8192 lr=0.001
+cf6f139	67.714020	67.714020	0.000	keep	milestones + role_conditional mb=8192 lr=0.001
+049d872	63.299636	63.299636	0.000	keep	role_conditional alone mb=8192 lr=0.001
+e2dc3b8	67.910446	67.910446	0.000	keep	milestones + role_conditional + penalize_vibe_change
+c0d6515	46.900490	46.900490	0.000	keep	milestones + role_conditional + penalize_vibe_change hidden_size=512
+4f06bb4	100.546450	100.546450	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit
+4f06bb4	100.546450	100.546450	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit
+b417516	70.251280	70.251280	0.000	keep	milestones + milestones_2 + role_conditional + penalize_vibe_change + credit
+68733bb	61.209363	61.209363	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit TIME_BUDGET=1200
+c2f19c3	68.375671	68.375671	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit ent_coef=0.05
+bb0590d	84.885930	84.885930	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit gae_lambda=0.95
+42c84ea	42.896097	42.896097	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit lr=0.0005
+6f03907	54.467262	54.467262	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit vf_coef=1.0
+7df4d96	25.177572	25.177572	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit gamma=0.99
+7df4d96	29.156599	29.156599	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit update_epochs=2
+897994e	51.766693	51.766693	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit mb=16384
+28405a4	51.732724	51.732724	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + aligner
+d546ec0	28.988475	28.988475	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit bptt=128
+d546ec0	22.824655	22.824655	0.000	keep	milestones_2 + role_conditional + penalize_vibe_change + credit
+3105862	32.470110	32.470110	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit ent_coef=0.005
+47d4f9a	18.291023	18.291023	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit clip_coef=0.3
+77f6ff7	6.436445	6.436445	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit gae_lambda=0.80
+65581d9	71.927720	71.927720	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit vf_coef=3.0
+54223a7	46.660047	46.660047	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + miner
+54223a7	46.660047	46.660047	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit + miner
+4ba6771	234.003110	234.003110	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout
+1a29b82	233.584500	233.584500	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout + scrambler
+1a29b82	233.584500	233.584500	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit + scout + scrambler
+710c38c	215.306060	215.306060	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout TIME_BUDGET=1200
+710c38c	215.306060	215.306060	0.000	discard	milestones + role_conditional + penalize_vibe_change + credit + scout TIME_BUDGET=1200
+e3b2a41	80.389570	80.389570	0.000	keep	milestones + role_conditional + penalize_vibe_change + scout (no credit)
+e3b2a41	80.389570	80.389570	0.000	discard	milestones + role_conditional + penalize_vibe_change + scout (no credit)
+e8a1f18	0.000000	0.000000	0.000	crash	milestones + role_conditional + credit + scout (no penalize_vibe_change)
+d4da31b	322.241272	322.241272	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout

@@ -2,11 +2,12 @@
 # =============================================================================
 # CoGames Autoresearch - Main Experiment Loop (v3)
 #
-# Changes from v2:
-# - Creates a fresh autoresearch/<tag> branch per session (Karpathy pattern)
-# - Fresh results.tsv per session (untracked by git)
-# - Detects "Credit balance is too low" and exits instead of spinning
-# - Better cost tracking
+# Each session:
+# 1. Creates a fresh autoresearch/<tag> branch from main
+# 2. Opens a GitHub Discussion as a session log
+# 3. Saves results to results/results_<tag>.tsv
+# 4. Updates the discussion after each experiment
+# 5. Exits cleanly on credit exhaustion
 # =============================================================================
 
 set -euo pipefail
@@ -18,17 +19,19 @@ OPENCLAW_BIN="/opt/homebrew/bin/openclaw"
 CLAUDE_BIN="$HOME/.local/bin/claude"
 WHATSAPP_NUMBER="+12065321138"
 CHECKPOINT_DIR="$REPO/checkpoints"
+RESULTS_DIR="$REPO/results"
+GH_REPO="SolbiatiAlessandro/cogames-autoresearch"
+GH_DISCUSSION_CATEGORY="DIC_kwDORhT1Bs4C3_6L"  # "Show and tell"
 
 AGENT_TIMEOUT=2400
 
 cd "$REPO"
-mkdir -p "$CHECKPOINT_DIR"
+mkdir -p "$CHECKPOINT_DIR" "$RESULTS_DIR"
 
 # =========================================================================
 # Session setup: create a fresh branch (Karpathy pattern)
 # =========================================================================
 
-# Generate a run tag from today's date (mar9, mar9b, mar9c, ...)
 BASE_TAG=$(date '+%b%-d' | tr '[:upper:]' '[:lower:]')
 RUN_TAG="$BASE_TAG"
 SUFFIX=""
@@ -36,13 +39,13 @@ while git rev-parse --verify "autoresearch/$RUN_TAG" >/dev/null 2>&1; do
     if [[ -z "$SUFFIX" ]]; then
         SUFFIX="b"
     else
-        # increment: b->c, c->d, etc.
         SUFFIX=$(echo "$SUFFIX" | tr 'a-y' 'b-z')
     fi
     RUN_TAG="${BASE_TAG}${SUFFIX}"
 done
 
 BRANCH="autoresearch/$RUN_TAG"
+RESULTS_FILE="$RESULTS_DIR/results_${RUN_TAG}.tsv"
 
 # Make sure we're on main and up to date
 git checkout main 2>/dev/null || true
@@ -51,15 +54,12 @@ git pull --rebase origin main 2>/dev/null || true
 # Create the fresh session branch
 git checkout -b "$BRANCH"
 
-# Fresh results.tsv for this session (copy header + any historical context from main)
-# Karpathy keeps results.tsv untracked; we start fresh but include the header
-if [[ -f results.tsv ]]; then
-    # Keep the existing file (has header + history from main)
-    # The agent will append to it during this session
-    :
-else
-    echo -e "commit\tcomposite_score\tmean_reward\tmemory_gb\tstatus\tdescription\te2e_seconds\tapi_cost_usd\tcogs_junctions_held\tcogs_junctions_aligned\tclips_junctions_held\taligned_by_agent\tscrambled_by_agent\tcells_visited\tdeaths\tmove_success\tmove_failed\tvibe_changes\tcarbon_deposited\tcarbon_amount\toxygen_amount\tsilicon_amount\tgermanium_amount\theart_amount\tminer_gained\taligner_gained\tscrambler_gained\tscout_gained" > results.tsv
-fi
+# Initialize session results file with header
+echo -e "commit\tcomposite_score\tmean_reward\tmemory_gb\tstatus\tdescription\te2e_seconds\tapi_cost_usd\tcogs_junctions_held\tcogs_junctions_aligned\tclips_junctions_held\taligned_by_agent\tscrambled_by_agent\tcells_visited\tdeaths\tmove_success\tmove_failed\tvibe_changes\tcarbon_deposited\tcarbon_amount\toxygen_amount\tsilicon_amount\tgermanium_amount\theart_amount\tminer_gained\taligner_gained\tscrambler_gained\tscout_gained" > "$RESULTS_FILE"
+
+# Also create/update the working results.tsv (what train.py writes to)
+# Copy from results file so train.py appends here, then we sync back
+cp "$RESULTS_FILE" "$REPO/results.tsv"
 
 # =========================================================================
 # Logging and helpers
@@ -126,8 +126,111 @@ get_best_score() {
       sort -t$'\t' -k2 -rn | head -1 | cut -f2
 }
 
+sync_results() {
+    # Sync working results.tsv → session results file
+    cp "$REPO/results.tsv" "$RESULTS_FILE"
+}
+
 # =========================================================================
-# Save PID and announce
+# GitHub Discussion — session log
+# =========================================================================
+
+DISCUSSION_URL=""
+DISCUSSION_NODE_ID=""
+
+get_starting_context() {
+    # Build the "starting from" context for the discussion
+    local prev_best
+    prev_best=$(tail -n+2 "$REPO/results.tsv" 2>/dev/null | sort -t$'\t' -k2 -rn | head -1 | cut -f6)
+    local prev_score
+    prev_score=$(get_best_score)
+
+    cat << EOF
+## Session: \`$RUN_TAG\`
+**Branch:** \`$BRANCH\`
+**Started:** $(date '+%Y-%m-%d %H:%M %Z')
+**Starting from:** main @ \`$(git log --oneline -1 main 2>/dev/null)\`
+
+### Starting state
+- Previous best composite score: ${prev_score:-"none"}
+- Best config: ${prev_best:-"none"}
+- **Key problem:** composite_score is misleading — high scores (200+) come from reward hacking (agents farm resources, hold 0 territory). This session focuses on game metrics.
+
+### Goals
+- Get agents that actually play the game (junctions held > 0, aligned_by_agent > 0)
+- Validate which reward combos produce real gameplay vs farming
+- All experiments now log 20 game metrics alongside composite score
+
+### Experiment log
+| # | Score | Junctions | Aligned | Status | Description |
+|---|------:|----------:|--------:|--------|-------------|
+EOF
+}
+
+create_discussion() {
+    local body
+    body=$(get_starting_context)
+    local title="Session $RUN_TAG — $(date '+%b %-d, %Y')"
+
+    # Create discussion via GraphQL
+    local repo_id
+    repo_id=$(gh api graphql -f query="{ repository(owner:\"SolbiatiAlessandro\", name:\"cogames-autoresearch\") { id } }" -q '.data.repository.id')
+
+    local result
+    result=$(gh api graphql -f query="
+mutation {
+  createDiscussion(input: {
+    repositoryId: \"$repo_id\",
+    categoryId: \"$GH_DISCUSSION_CATEGORY\",
+    title: \"$title\",
+    body: $(echo "$body" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+  }) {
+    discussion {
+      url
+      id
+    }
+  }
+}" 2>/dev/null) || true
+
+    DISCUSSION_URL=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['createDiscussion']['discussion']['url'])" 2>/dev/null || echo "")
+    DISCUSSION_NODE_ID=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['createDiscussion']['discussion']['id'])" 2>/dev/null || echo "")
+
+    if [[ -n "$DISCUSSION_URL" ]]; then
+        log "Created discussion: $DISCUSSION_URL"
+    else
+        log "Failed to create discussion (non-critical, continuing)"
+    fi
+}
+
+update_discussion_body() {
+    # Rebuild the full discussion body with current experiment table
+    [[ -z "$DISCUSSION_NODE_ID" ]] && return
+
+    local body
+    body=$(get_starting_context)
+
+    # Append experiment rows from this session's results
+    local exp_num=0
+    while IFS=$'\t' read -r commit score mean_reward mem status desc e2e cost jh ja ch aa sa rest; do
+        [[ "$commit" == "commit" ]] && continue  # skip header
+        exp_num=$((exp_num + 1))
+        body+="| $exp_num | $score | ${jh:-?} | ${aa:-?} | $status | $desc |
+"
+    done < "$RESULTS_FILE"
+
+    gh api graphql -f query="
+mutation {
+  updateDiscussion(input: {
+    discussionId: \"$DISCUSSION_NODE_ID\",
+    body: $(echo "$body" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+  }) {
+    discussion { url }
+  }
+}" >/dev/null 2>&1 || log "Failed to update discussion (non-critical)"
+}
+
+# =========================================================================
+# Save PID, create discussion, announce
 # =========================================================================
 
 echo $$ > "$PID_FILE"
@@ -137,9 +240,12 @@ log "CoGames Autoresearch Loop v3 STARTING"
 log "PID: $$"
 log "Repo: $REPO"
 log "Branch: $BRANCH (fresh session)"
+log "Results: $RESULTS_FILE"
 log "=========================================="
 
-send_whatsapp "🧪 CoGames autoresearch session started — branch $BRANCH"
+create_discussion
+
+send_whatsapp "🧪 CoGames autoresearch session started — branch $BRANCH${DISCUSSION_URL:+ — $DISCUSSION_URL}"
 
 consecutive_crashes=0
 consecutive_credit_failures=0
@@ -167,7 +273,7 @@ while true; do
         fi
     fi
 
-    # === Clean train_dir (keep disk tidy) ===
+    # === Clean train_dir ===
     rm -rf "$REPO/train_dir"
     mkdir -p "$REPO/train_dir"
 
@@ -187,10 +293,10 @@ Session branch: $BRANCH (experiment #$experiment_count)
 === CURRENT STATE ===
 $(git log --oneline -8 2>/dev/null)
 
-=== RESULTS SO FAR ===
+=== THIS SESSION'S RESULTS ===
 $(cat results.tsv 2>/dev/null || echo 'no results yet')
 
-=== CURRENT BEST SCORE: ${BEST_SCORE} ===
+=== CURRENT BEST SCORE: ${BEST_SCORE:-none} ===
 
 === YOUR TASK: Run ONE complete experiment iteration ===
 
@@ -228,13 +334,13 @@ DO NOT stop, DO NOT ask questions. Run the full experiment end-to-end."
     EXPERIMENT_ELAPSED=$(( EXPERIMENT_END - EXPERIMENT_START ))
 
     # ===================================================================
-    # CHECK FOR CREDIT EXHAUSTION — exit instead of spinning
+    # CHECK FOR CREDIT EXHAUSTION
     # ===================================================================
     if echo "$AGENT_OUTPUT" | grep -qi "credit balance is too low\|insufficient credits\|billing\|rate limit.*exceeded\|quota exceeded"; then
         consecutive_credit_failures=$((consecutive_credit_failures + 1))
         log "⚠️ API CREDIT ISSUE detected (attempt $consecutive_credit_failures/3)"
         if [[ $consecutive_credit_failures -ge 3 ]]; then
-            send_whatsapp "🛑 CoGames autoresearch: API credits exhausted after $experiment_count experiments on branch $BRANCH. Loop stopped."
+            send_whatsapp "🛑 CoGames autoresearch ($BRANCH): API credits exhausted after $experiment_count experiments. Loop stopped.${DISCUSSION_URL:+ $DISCUSSION_URL}"
             log "API credits exhausted after 3 consecutive failures. Exiting."
             exit 1
         fi
@@ -244,7 +350,7 @@ DO NOT stop, DO NOT ask questions. Run the full experiment end-to-end."
     fi
     consecutive_credit_failures=0
 
-    # Estimate API cost from token counts in Claude output
+    # Estimate API cost
     INPUT_KTOK=$(echo "$AGENT_OUTPUT" | grep -oE "[0-9]+(\.[0-9]+)?k in" | grep -oE "[0-9]+(\.[0-9]+)?" | tail -1 || echo "0")
     OUTPUT_KTOK=$(echo "$AGENT_OUTPUT" | grep -oE "[0-9]+(\.[0-9]+)?k out" | grep -oE "[0-9]+(\.[0-9]+)?" | tail -1 || echo "0")
     API_COST=$(python3 -c "
@@ -260,7 +366,7 @@ print(f'{cost:.4f}')
     echo "$AGENT_OUTPUT" | tail -50 >> "$LOG"
     log "--- End agent output ---"
 
-    # === ARCHIVE CHECKPOINT (before any git reset) ===
+    # === ARCHIVE CHECKPOINT ===
     CURRENT_COMMIT=$(git rev-parse --short=7 HEAD 2>/dev/null)
     archive_checkpoint "$CURRENT_COMMIT"
 
@@ -274,7 +380,7 @@ print(f'{cost:.4f}')
         consecutive_crashes=$((consecutive_crashes + 1))
         send_whatsapp "🚨 CoGames autoresearch CRITICALLY BLOCKED (experiment #$experiment_count on $BRANCH). $REASON"
         if [[ $consecutive_crashes -ge 3 ]]; then
-            send_whatsapp "🛑 CoGames autoresearch stopped after 3 critical blocks on $BRANCH. Manual intervention needed."
+            send_whatsapp "🛑 CoGames autoresearch stopped after 3 critical blocks on $BRANCH.${DISCUSSION_URL:+ $DISCUSSION_URL}"
             log "Too many consecutive critical blocks. Exiting."
             exit 1
         fi
@@ -285,11 +391,20 @@ print(f'{cost:.4f}')
         DONE_LINE=$(echo "$AGENT_OUTPUT" | grep "EXPERIMENT_DONE" | head -1 || echo "")
         log "Experiment #$experiment_count complete. $DONE_LINE"
 
+        # Sync results to session file and update discussion
+        sync_results
+        update_discussion_body
+
+        # Commit results file to branch
+        cd "$REPO"
+        git add "$RESULTS_FILE" results.tsv 2>/dev/null || true
+        git commit -m "results: update after experiment #$experiment_count" --allow-empty 2>/dev/null || true
+
         # Sync to Notion
         bash "$REPO/sync_notion.sh" >> "$LOG" 2>&1 &
 
-        # Push session branch to GitHub
-        cd "$REPO" && git push -u origin "$BRANCH" >> "$LOG" 2>&1 || true
+        # Push session branch
+        git push -u origin "$BRANCH" >> "$LOG" 2>&1 || true
 
         log "Sleeping 10 seconds before next experiment..."
         sleep 10
