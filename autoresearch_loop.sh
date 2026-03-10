@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# CoGames Autoresearch - Main Experiment Loop (v2)
+# CoGames Autoresearch - Main Experiment Loop (v3)
 #
-# Fixes from mar7 session:
-# - Aggressive process cleanup between runs (OOM fix)
-# - Checkpoint archiving per commit hash
-# - Updated best score reference
+# Changes from v2:
+# - Creates a fresh autoresearch/<tag> branch per session (Karpathy pattern)
+# - Fresh results.tsv per session (untracked by git)
+# - Detects "Credit balance is too low" and exits instead of spinning
+# - Better cost tracking
 # =============================================================================
+
+set -euo pipefail
 
 REPO="$HOME/Projects/cogames-autoresearch"
 LOG="$REPO/autoresearch_loop.log"
@@ -20,6 +23,47 @@ AGENT_TIMEOUT=2400
 
 cd "$REPO"
 mkdir -p "$CHECKPOINT_DIR"
+
+# =========================================================================
+# Session setup: create a fresh branch (Karpathy pattern)
+# =========================================================================
+
+# Generate a run tag from today's date (mar9, mar9b, mar9c, ...)
+BASE_TAG=$(date '+%b%-d' | tr '[:upper:]' '[:lower:]')
+RUN_TAG="$BASE_TAG"
+SUFFIX=""
+while git rev-parse --verify "autoresearch/$RUN_TAG" >/dev/null 2>&1; do
+    if [[ -z "$SUFFIX" ]]; then
+        SUFFIX="b"
+    else
+        # increment: b->c, c->d, etc.
+        SUFFIX=$(echo "$SUFFIX" | tr 'a-y' 'b-z')
+    fi
+    RUN_TAG="${BASE_TAG}${SUFFIX}"
+done
+
+BRANCH="autoresearch/$RUN_TAG"
+
+# Make sure we're on main and up to date
+git checkout main 2>/dev/null || true
+git pull --rebase origin main 2>/dev/null || true
+
+# Create the fresh session branch
+git checkout -b "$BRANCH"
+
+# Fresh results.tsv for this session (copy header + any historical context from main)
+# Karpathy keeps results.tsv untracked; we start fresh but include the header
+if [[ -f results.tsv ]]; then
+    # Keep the existing file (has header + history from main)
+    # The agent will append to it during this session
+    :
+else
+    echo -e "commit\tcomposite_score\tmean_reward\tmemory_gb\tstatus\tdescription\te2e_seconds\tapi_cost_usd\tcogs_junctions_held\tcogs_junctions_aligned\tclips_junctions_held\taligned_by_agent\tscrambled_by_agent\tcells_visited\tdeaths\tmove_success\tmove_failed\tvibe_changes\tcarbon_deposited\tcarbon_amount\toxygen_amount\tsilicon_amount\tgermanium_amount\theart_amount\tminer_gained\taligner_gained\tscrambler_gained\tscout_gained" > results.tsv
+fi
+
+# =========================================================================
+# Logging and helpers
+# =========================================================================
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"
@@ -82,14 +126,23 @@ get_best_score() {
       sort -t$'\t' -k2 -rn | head -1 | cut -f2
 }
 
+# =========================================================================
+# Save PID and announce
+# =========================================================================
+
+echo $$ > "$PID_FILE"
+
 log "=========================================="
-log "CoGames Autoresearch Loop v2 STARTING"
+log "CoGames Autoresearch Loop v3 STARTING"
 log "PID: $$"
 log "Repo: $REPO"
-log "Branch: $(git branch --show-current 2>/dev/null || echo unknown)"
+log "Branch: $BRANCH (fresh session)"
 log "=========================================="
 
+send_whatsapp "🧪 CoGames autoresearch session started — branch $BRANCH"
+
 consecutive_crashes=0
+consecutive_credit_failures=0
 experiment_count=0
 
 while true; do
@@ -114,7 +167,7 @@ while true; do
         fi
     fi
 
-    # === Clean train_dir (keep disk tidy, saves nothing useful without archiving) ===
+    # === Clean train_dir (keep disk tidy) ===
     rm -rf "$REPO/train_dir"
     mkdir -p "$REPO/train_dir"
 
@@ -129,6 +182,7 @@ while true; do
     PROMPT="You are an autonomous RL researcher running ONE experiment iteration on the CoGames autoresearch project.
 
 Working directory: $REPO (you are already here)
+Session branch: $BRANCH (experiment #$experiment_count)
 
 === CURRENT STATE ===
 $(git log --oneline -8 2>/dev/null)
@@ -138,53 +192,24 @@ $(cat results.tsv 2>/dev/null || echo 'no results yet')
 
 === CURRENT BEST SCORE: ${BEST_SCORE} ===
 
-=== ⚠️ REWARD HACKING WARNING ===
-composite_score is the sum of ALL shaped rewards — it does NOT mean agents are winning.
-The current best (234) has ZERO junctions held. Agents are just farming easy rewards.
-
-results.tsv now tracks 20 game metrics alongside composite_score. Key ones:
-
-OBJECTIVE (the actual game — are we winning?):
-  - cogs_junctions_held: junctions held by our team (THE objective, currently 0!)
-  - cogs_junctions_aligned: junctions we captured
-  - clips_junctions_held: junctions held by enemy (currently ~1.2M — they own everything)
-
-AGENT BEHAVIOR (are agents doing anything useful?):
-  - aligned_by_agent / scrambled_by_agent: territory actions (currently 0!)
-  - cells_visited, deaths, move_success/failed, vibe_changes
-
-ECONOMY (resource flow):
-  - carbon/oxygen/silicon/germanium_amount, carbon_deposited, heart_amount
-
-GEAR (is specialization happening?):
-  - miner/aligner/scrambler/scout_gained
-
-After each run, grep the game metrics from run.log. Look at the full picture.
-Pick the metric that looks most promising to improve — maybe it's getting agents
-to actually align junctions, or pick up gear, or deposit resources.
-Prioritize experiments that move the GAME metrics, not just composite_score.
-
 === YOUR TASK: Run ONE complete experiment iteration ===
 
-Follow program.md exactly. Summary of the loop:
-1. Read program.md and ALL files in knowledge/ (especially knowledge/findings.md — critical lessons from previous sessions)
+Follow program.md exactly — READ IT FIRST, especially the 'What Has Been Tried' and
+'What Better Means' sections. Also read knowledge/findings.md for reward hacking analysis.
+
+Summary of the loop:
+1. Read program.md and ALL files in knowledge/ (especially findings.md)
 2. Look at results above — pick ONE new experiment idea NOT already tried
-3. The best combo so far: milestones + role_conditional + penalize_vibe_change + credit + scout (score 234.0)
-4. Be creative — explore new hyperparams, architecture, variant combos, or revisit promising ideas with tweaks.
-5. TIME BUDGET: You may change TIME_BUDGET in train.py by monkey-patching:
-   Add near top of main(): import prepare; prepare.TIME_BUDGET = <seconds>
-   Default is 600s. You may use 600, 1200, or 1800.
-   IMPORTANT: If you increase TIME_BUDGET, also adjust the LR schedule —
-   the default schedule decays LR to near-zero at 600s. For longer runs,
-   you may need to increase the learning rate or use a different schedule.
-6. Modify train.py (ONLY this file)
-7. git add train.py && git commit -m 'experiment: <description>'
-8. Run: uv run train.py > run.log 2>&1 (WAIT for completion)
-9. Check results: grep '^composite_score:\|^mean_reward:' run.log
-10. If crash: tail -50 run.log, fix train.py, retry up to 2 times
-11. Log to results.tsv
-12. If score > ${BEST_SCORE}: KEEP commit. Otherwise: git reset --hard HEAD~1
-13. End your response with exactly one of:
+3. Focus on GAME METRICS (cogs_junctions_held, aligned_by_agent), not just composite_score
+4. Modify train.py (ONLY this file)
+5. git add train.py && git commit -m 'experiment: <description> — <game metrics summary>'
+6. Run: uv run train.py > run.log 2>&1 (WAIT for completion)
+7. Check results: grep '^composite_score:\|^mean_reward:' run.log
+8. Check game metrics: grep -A20 'Game Metrics' run.log
+9. If crash: tail -50 run.log, fix train.py, retry up to 2 times
+10. Log to results.tsv (train.py does this automatically)
+11. If genuine game progress: KEEP commit. If reward hacking or worse: git reset --hard HEAD~1
+12. End your response with exactly one of:
     EXPERIMENT_DONE: score=<score> status=keep|discard|crash description=<what you tried>
     CRITICALLY_BLOCKED: <reason>
 
@@ -202,8 +227,24 @@ DO NOT stop, DO NOT ask questions. Run the full experiment end-to-end."
     EXPERIMENT_END=$(date +%s)
     EXPERIMENT_ELAPSED=$(( EXPERIMENT_END - EXPERIMENT_START ))
 
-    # Estimate API cost from token counts in Claude output (rough heuristic)
-    # Claude Code prints token usage at end: "Tokens: Xk in / Yk out"
+    # ===================================================================
+    # CHECK FOR CREDIT EXHAUSTION — exit instead of spinning
+    # ===================================================================
+    if echo "$AGENT_OUTPUT" | grep -qi "credit balance is too low\|insufficient credits\|billing\|rate limit.*exceeded\|quota exceeded"; then
+        consecutive_credit_failures=$((consecutive_credit_failures + 1))
+        log "⚠️ API CREDIT ISSUE detected (attempt $consecutive_credit_failures/3)"
+        if [[ $consecutive_credit_failures -ge 3 ]]; then
+            send_whatsapp "🛑 CoGames autoresearch: API credits exhausted after $experiment_count experiments on branch $BRANCH. Loop stopped."
+            log "API credits exhausted after 3 consecutive failures. Exiting."
+            exit 1
+        fi
+        log "Retrying in 60 seconds..."
+        sleep 60
+        continue
+    fi
+    consecutive_credit_failures=0
+
+    # Estimate API cost from token counts in Claude output
     INPUT_KTOK=$(echo "$AGENT_OUTPUT" | grep -oE "[0-9]+(\.[0-9]+)?k in" | grep -oE "[0-9]+(\.[0-9]+)?" | tail -1 || echo "0")
     OUTPUT_KTOK=$(echo "$AGENT_OUTPUT" | grep -oE "[0-9]+(\.[0-9]+)?k out" | grep -oE "[0-9]+(\.[0-9]+)?" | tail -1 || echo "0")
     API_COST=$(python3 -c "
@@ -231,9 +272,9 @@ print(f'{cost:.4f}')
         REASON=$(echo "$AGENT_OUTPUT" | grep "CRITICALLY_BLOCKED" | head -1)
         log "CRITICAL BLOCK DETECTED: $REASON"
         consecutive_crashes=$((consecutive_crashes + 1))
-        send_whatsapp "🚨 CoGames autoresearch CRITICALLY BLOCKED (experiment #$experiment_count). $REASON"
+        send_whatsapp "🚨 CoGames autoresearch CRITICALLY BLOCKED (experiment #$experiment_count on $BRANCH). $REASON"
         if [[ $consecutive_crashes -ge 3 ]]; then
-            send_whatsapp "🛑 CoGames autoresearch stopped after 3 critical blocks in a row. Manual intervention needed."
+            send_whatsapp "🛑 CoGames autoresearch stopped after 3 critical blocks on $BRANCH. Manual intervention needed."
             log "Too many consecutive critical blocks. Exiting."
             exit 1
         fi
@@ -247,8 +288,8 @@ print(f'{cost:.4f}')
         # Sync to Notion
         bash "$REPO/sync_notion.sh" >> "$LOG" 2>&1 &
 
-        # Push results to GitHub
-        cd "$REPO" && git push >> "$LOG" 2>&1 || true
+        # Push session branch to GitHub
+        cd "$REPO" && git push -u origin "$BRANCH" >> "$LOG" 2>&1 || true
 
         log "Sleeping 10 seconds before next experiment..."
         sleep 10
