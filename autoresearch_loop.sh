@@ -20,13 +20,59 @@ CLAUDE_BIN="$HOME/.local/bin/claude"
 WHATSAPP_NUMBER="+12065321138"
 CHECKPOINT_DIR="$REPO/checkpoints"
 RESULTS_DIR="$REPO/results"
+DISCUSSIONS_DIR="$REPO/discussions"
 GH_REPO="SolbiatiAlessandro/cogames-autoresearch"
 GH_DISCUSSION_CATEGORY="DIC_kwDORhT1Bs4C3_6L"  # "Show and tell"
 
 AGENT_TIMEOUT=2400
 
 cd "$REPO"
-mkdir -p "$CHECKPOINT_DIR" "$RESULTS_DIR"
+mkdir -p "$CHECKPOINT_DIR" "$RESULTS_DIR" "$DISCUSSIONS_DIR"
+
+# =========================================================================
+# Sync discussions from GitHub (so agent can read prior session reports)
+# =========================================================================
+
+sync_discussions() {
+    log "Syncing discussions from GitHub..."
+    gh api graphql -f query='
+    {
+      repository(owner: "SolbiatiAlessandro", name: "cogames-autoresearch") {
+        discussions(first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
+          nodes {
+            number
+            title
+            body
+            createdAt
+            url
+          }
+        }
+      }
+    }' 2>/dev/null | python3 -c "
+import json, sys, re, os
+data = json.load(sys.stdin)
+discussions_dir = '$DISCUSSIONS_DIR'
+os.makedirs(discussions_dir, exist_ok=True)
+for d in data['data']['repository']['discussions']['nodes']:
+    num = d['number']
+    title = d['title']
+    body = d['body']
+    created = d['createdAt'][:10]
+    url = d['url']
+    slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:60]
+    filename = os.path.join(discussions_dir, f'{num:03d}-{slug}.md')
+    with open(filename, 'w') as f:
+        f.write(f'# {title}\n\n')
+        f.write(f'**Discussion:** {url}\n')
+        f.write(f'**Created:** {created}\n\n')
+        f.write(body)
+    print(f'  Synced: {filename}', file=sys.stderr)
+" 2>&1 | while read line; do log "$line"; done
+    log "Discussions synced."
+}
+
+# Sync prior session discussions from GitHub
+sync_discussions
 
 # =========================================================================
 # Session setup: create a fresh branch (Karpathy pattern)
@@ -197,6 +243,14 @@ mutation {
 
     if [[ -n "$DISCUSSION_URL" ]]; then
         log "Created discussion: $DISCUSSION_URL"
+        # Save this session's discussion to the discussions folder
+        local disc_num
+        disc_num=$(echo "$DISCUSSION_URL" | grep -oE '[0-9]+$' || echo "0")
+        local disc_slug
+        disc_slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g' | head -c 60)
+        local disc_file="$DISCUSSIONS_DIR/$(printf '%03d' "$disc_num")-${disc_slug}.md"
+        echo -e "# $title\n\n**Discussion:** $DISCUSSION_URL\n**Created:** $(date '+%Y-%m-%d')\n\n$body" > "$disc_file"
+        git add "$disc_file" 2>/dev/null || true
     else
         log "Failed to create discussion (non-critical, continuing)"
     fi
