@@ -25,7 +25,7 @@ from prepare import TIME_BUDGET, MISSION, compute_composite_score
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2", "role_conditional", "penalize_vibe_change", "credit", "scout"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -33,7 +33,7 @@ POLICY = "class=lstm"  # options: lstm, baseline, stateless, or custom class pat
 HIDDEN_SIZE = 256
 
 # Training hyperparameters
-LEARNING_RATE = 0.002  # 2x default; dense credit+scout rewards may allow faster convergence
+LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
 BPTT_HORIZON = 64  # default
@@ -43,7 +43,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + credit + scout lr=0.002"
+DESCRIPTION = "milestones + role_conditional + penalize_vibe_change (honest baseline — no credit/scout farming)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
