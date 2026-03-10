@@ -19,14 +19,15 @@ import sys
 import time
 from datetime import datetime
 
-from prepare import TIME_BUDGET, MISSION, compute_composite_score
+from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
+TIME_BUDGET = 300  # 5-minute experiments for rapid iteration
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2", "role_conditional", "penalize_vibe_change", "miner"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -44,7 +45,7 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones + role_conditional + penalize_vibe_change (honest baseline — no credit/scout farming)"
+DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner — lean honest + miner-specific shaping"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
