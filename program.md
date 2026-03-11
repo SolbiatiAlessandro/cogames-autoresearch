@@ -125,20 +125,12 @@ LOOP FOREVER:
 
 ## Hardware & Training Speed
 
-This machine has an **NVIDIA A40 GPU (44GB VRAM)** and 96 CPU cores.
+**Use GPU if available.** `DEVICE = "auto"` in train.py picks CUDA automatically when a GPU is present — do not change this. GPU training is significantly faster than CPU (3-4x+ in SPS), and also initializes faster. If you ever see `DEVICE = "cpu"` in train.py, change it back to `"auto"`.
 
-**Always train on GPU.** `DEVICE = "auto"` in train.py resolves to `cuda` automatically — do not change this.
-
-Measured throughput on `cogsguard_machina_1.basic` (3-min benchmark, minibatch=4096, hidden_size=64):
-
-| Device | Avg SPS | Steps in 10 min |
-|--------|--------:|----------------:|
-| GPU (A40, cuda) | **~25,000** | **~15M** |
-| CPU (96 cores) | ~7,000 | ~4M |
-
-**GPU is 3.6x faster.** CPU also takes ~90s to initialize vs ~45s on GPU. For a 10-minute TIME_BUDGET, GPU gives ~15M agent steps — enough for meaningful learning. CPU gives ~4M.
-
-If you ever see `DEVICE = "cpu"` in train.py, change it back to `"auto"`.
+To check what device you're on:
+```bash
+uv run python -c "import torch; print('cuda' if torch.cuda.is_available() else 'cpu', getattr(torch.cuda, 'get_device_name', lambda i: 'n/a')(0) if torch.cuda.is_available() else '')"
+```
 
 ## ⚠️ What "Better" means
 
