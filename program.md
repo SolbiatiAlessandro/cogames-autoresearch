@@ -23,6 +23,8 @@ That message is your research brief:
 
 ## Setup (do this ONCE at the start)
 
+0. **Set PATH**: `export PATH="$HOME/.local/bin:$PATH"` — required for `uv` and `gh`.
+
 1. **Parse the human's starting message** for branch, direction, and time_budget.
 2. **Create the branch**: `git checkout -b autoresearch/<branch>` from current main.
 3. **Set TIME_BUDGET** in train.py if the human specified a non-default time_budget or described some rules on how to set time budgets.
@@ -43,10 +45,11 @@ That message is your research brief:
 6. **Verify cogames is installed**: `uv run python -c "import cogames; print('ok')"`. If not: `uv pip install -e ~/Projects/cogames`
 7. **Create a GitHub Discussion** for this session:
    ```bash
-   gh discussion create --repo SolbiatiAlessandro/cogames-autoresearch \
-     --category "Show and tell" \
-     --title "Session <branch> — $(date '+%b %-d, %Y')" \
-     --body "<starting context: direction, what you learned from prior discussions, your plan>"
+   gh api graphql -f query='mutation($repoId:ID!,$catId:ID!,$title:String!,$body:String!){createDiscussion(input:{repositoryId:$repoId,categoryId:$catId,title:$title,body:$body}){discussion{number url}}}' \
+     -f repoId="R_kgDORhT1Bg" \
+     -f catId="DIC_kwDORhT1Bs4C3_6L" \
+     -f title="Session <branch> — $(date '+%b %-d, %Y')" \
+     -f body="<starting context: direction, what you learned from prior discussions, your plan>"
    ```
    This discussion is your session log. Future sessions will read it.
 8. **Initialize results.tsv** with the header row (see Logging section).
@@ -71,6 +74,12 @@ LOOP FOREVER:
    - Equal or worse → **discard** + `git reset --hard HEAD~1`
 8. **Push**: `git push -u origin autoresearch/<branch>`
 9. **Update the GitHub Discussion** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions. If you can't push the discussion, just write a discussion_<branch_name>.md in the results.
+   ```bash
+   gh api graphql -f query='mutation($id:ID!,$body:String!){updateDiscussion(input:{discussionId:$id,body:$body}){discussion{url}}}' \
+     -f id="<discussion_node_id>" \
+     -f body="<updated full body>"
+   ```
+   Get the discussion node ID from the createDiscussion response, or via: `gh api graphql -f query='{ repository(owner:"SolbiatiAlessandro", name:"cogames-autoresearch") { discussion(number:<N>) { id } } }'`
 10. Go to 1.
 
 **NEVER STOP.** Do not pause to ask questions. There is no human listening. You are autonomous. If you run out of ideas, re-read the GitHub Discussions and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human kills your process.
