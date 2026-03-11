@@ -52,7 +52,26 @@ That message is your research brief:
    - **Direction** — what you're exploring and why
    - **Prior findings** — key insights from previous sessions
    - **Plan** — your experiment strategy
+   - **Experiment Log** — updated as you go (key findings only, not every run)
    - **INFRA** — leave blank at start; fill in ONLY if you hit a setup/tooling problem that cost you >1 experiment (e.g. missing CLI, broken PATH, package install failure). Be specific: what broke, what you did, how you fixed it or worked around it. Future sessions need to know.
+
+   **Always write the discussion to BOTH places:**
+   1. `results/discussion_<branch>.md` — local file, always written first, survives if GitHub is unreachable
+   2. GitHub Discussion via `gh` — post the same content; skip if `gh` is unavailable but always do the local file
+
+   At setup, create the local file immediately:
+   ```bash
+   mkdir -p results
+   cat > results/discussion_<branch>.md << 'DISCUSSION'
+   ## Session <branch> — <date>
+   **Direction:** <direction>
+   **Prior findings:** <key insights from prior discussions>
+   **Plan:** <your strategy>
+   **Experiment Log:** (to be filled)
+   **INFRA:** (fill only if something broke)
+   DISCUSSION
+   ```
+   Then attempt to create the GitHub Discussion. If `gh` fails, continue — the local file is enough.
 
    This discussion is your session log. Future sessions will read it.
 8. **Initialize results.tsv** with the header row (see Logging section).
@@ -82,7 +101,10 @@ LOOP FOREVER:
    ⚠️ **NEVER commit train.py before running it.** Every commit must have a corresponding results.tsv row. If the run crashed, commit with status=crash and score=0.
    ⚠️ **Do NOT use `git reset --hard`** to discard experiments — commit them with status=discard so the history is preserved for future sessions to learn from.
 8. **Push**: `git push -u origin autoresearch/<branch>`
-9. **Update the GitHub Discussion** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions. If you can't push the discussion, just write a discussion_<branch_name>.md in the results/ folder.
+9. **Update the GitHub Discussion AND the local file** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions.
+   - Always write to `results/discussion_<branch>.md` locally (this survives even if GitHub is unreachable)
+   - Also post to GitHub Discussion if `gh` is available
+   - Both should stay in sync — same content, same updates
 10. Go to 1.
 
 **NEVER STOP.** Do not pause to ask questions. There is no human listening. You are autonomous. If you run out of ideas, re-read the GitHub Discussions and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human kills your process.
