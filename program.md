@@ -48,6 +48,12 @@ That message is your research brief:
      --title "Session <branch> — $(date '+%b %-d, %Y')" \
      --body "<starting context: direction, what you learned from prior discussions, your plan>"
    ```
+   Structure your discussion body with these sections:
+   - **Direction** — what you're exploring and why
+   - **Prior findings** — key insights from previous sessions
+   - **Plan** — your experiment strategy
+   - **INFRA** — leave blank at start; fill in ONLY if you hit a setup/tooling problem that cost you >1 experiment (e.g. missing CLI, broken PATH, package install failure). Be specific: what broke, what you did, how you fixed it or worked around it. Future sessions need to know.
+
    This discussion is your session log. Future sessions will read it.
 8. **Initialize results.tsv** with the header row (see Logging section).
 9. **Start the experiment loop.**
@@ -58,19 +64,25 @@ LOOP FOREVER:
 
 1. **Think**: look at `git log --oneline -5` and `cat results.tsv`. What should you try next, given the research direction?
 2. **Edit** `train.py` with one experimental idea. Update `DESCRIPTION`.
-3. **Commit**: `git add train.py && git commit -m "experiment: <description>"`
-4. **Run**: `uv run train.py > run.log 2>&1`
-5. **Check results**:
+3. **Run**: `uv run train.py > run.log 2>&1`
+4. **Check results**:
    - `grep "^composite_score:\|^mean_reward:" run.log`
    - `grep -A20 "Game Metrics" run.log` — are agents actually playing the game?
    - If empty → crash. `tail -50 run.log`, fix, retry up to 2 times.
-6. **Log** to results.tsv (train.py auto-appends most columns; you fill in session_tokens_cumulative and session_cost_cumulative — see Logging section).
-7. **Decide**:
+5. **Log** to results.tsv (train.py auto-appends most columns; you fill in session_tokens_cumulative and session_cost_cumulative — see Logging section).
+6. **Decide**:
    - Genuine game progress (junctions held, aligned_by_agent > 0) → **keep**
-   - Score up but game metrics flat/zero → reward hacking → **discard** + `git reset --hard HEAD~1`
-   - Equal or worse → **discard** + `git reset --hard HEAD~1`
+   - Score up but game metrics flat/zero → reward hacking → **discard**
+   - Equal or worse → **discard**
+7. **Commit** `train.py` AND `results.tsv` together in a single commit:
+   ```bash
+   git add train.py results.tsv
+   git commit -m "experiment: <description> | score=<X> | junctions=<Y> | aligned=<Z> | status=<keep/discard/crash>"
+   ```
+   ⚠️ **NEVER commit train.py before running it.** Every commit must have a corresponding results.tsv row. If the run crashed, commit with status=crash and score=0.
+   ⚠️ **Do NOT use `git reset --hard`** to discard experiments — commit them with status=discard so the history is preserved for future sessions to learn from.
 8. **Push**: `git push -u origin autoresearch/<branch>`
-9. **Update the GitHub Discussion** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions. If you can't push the discussion, just write a discussion_<branch_name>.md in the results.
+9. **Update the GitHub Discussion** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions. If you can't push the discussion, just write a discussion_<branch_name>.md in the results/ folder.
 10. Go to 1.
 
 **NEVER STOP.** Do not pause to ask questions. There is no human listening. You are autonomous. If you run out of ideas, re-read the GitHub Discussions and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human kills your process.
@@ -111,9 +123,17 @@ commit	composite_score	mean_reward	memory_gb	status	description	timestamp	e2e_se
 
 ## Commit messages
 
-Include: (1) what you changed, (2) game metrics summary, (3) your assessment.
+Every commit message must include the result. Format:
+```
+experiment: <what you changed> | score=<X> | junctions=<Y> | aligned=<Z> | status=<keep/discard/crash>
+```
 
-Example: `experiment: milestones_2 + role_conditional — junctions_held=500, aligned=3, real progress`
+Examples:
+- `experiment: milestones_2 + role_conditional | score=67.9 | junctions=0 | aligned=0 | status=keep`
+- `experiment: add scout reward | score=234.0 | junctions=0 | aligned=0 | status=discard` (reward hacking)
+- `experiment: penalize_vibe_change + miner | score=0 | junctions=0 | aligned=0 | status=crash`
+
+This makes `git log --oneline` a readable experiment leaderboard at a glance.
 
 ## Checkpoints
 
