@@ -108,7 +108,16 @@ LOOP FOREVER:
    ⚠️ **NEVER commit train.py before running it.** Every commit must have a corresponding results.tsv row. If the run crashed, commit with status=crash and score=0.
    ⚠️ **Do NOT use `git reset --hard`** to discard experiments — commit them with status=discard so the history is preserved for future sessions to learn from.
 8. **Push**: `git push -u origin autoresearch/<branch>`
-9. **Update the GitHub Discussion AND the local file** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions.
+9. **Check for human comments** in the GitHub Discussion before each experiment. Look for new comments since your last check:
+   ```bash
+   # Get discussion number from your branch name (e.g., autoresearch/mar11 -> extract "mar11" or use latest)
+   gh api repos/SolbiatiAlessandro/cogames-autoresearch/discussions      -X GET -f sort=created_at -f direction=desc -f per_page=1      -q '.[] | select(.title | contains("'"'"'<your-branch-name>'"'"'")) | .number'
+   # Then fetch comments on that discussion
+   gh api repos/SolbiatiAlessandro/cogames-autoresearch/discussions/<NUMBER>/comments      -q '.[].body'
+   ```
+   If there are new human comments, read them carefully — they may contain steering instructions, new hypotheses to try, or questions. Incorporate them into your next experiment if relevant.
+
+10. **Update the GitHub Discussion AND the local file** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions.
    - Always write to `results/discussion_<branch>.md` locally (this survives even if GitHub is unreachable)
    - Also post to GitHub Discussion via GraphQL:
    ```bash
