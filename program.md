@@ -40,8 +40,27 @@ That message is your research brief:
 5. **Read the repo files**:
    - `prepare.py` — fixed evaluation harness. **Do not modify.**
    - `train.py` — the ONE file you edit.
-   - `knowledge/` — domain context, reward variant docs, `findings.md`.
+   - `knowledge/` — domain context, reward variant docs, `findings.md`. See below for full structure.
    - `results/` — per-session results files from prior runs.
+
+   **knowledge/ folder structure:**
+   - `alessandro_research_ideas_one.md` — Alessandro's first research brainstorm: experiment ideas for intrinsic motivation, social influence, reciprocity, synchronization (references Wang 2019, Jaques 2019, Baker 2020, Jaderberg 2019, Levin).
+   - `alessandro_research_ideas_two.md` — Alessandro's second research brainstorm: deeper dives into MAPPO, QMIX, causal emergence, tangential action spaces, zero-shot coordination (references Yu 2021, Rashid 2018, Hoel 2025, TAS 2025, Barrett & Stone).
+   - `cogames_overview.md` — Overview of the CoGames environment and the Alignment League Benchmark.
+   - `findings.md` — Experimental findings log from prior sessions.
+   - `reward_variants.md` — Reference guide for all available reward variant configurations.
+   - `training_tips.md` — Hyperparameter tuning and common failure modes.
+   - `papers/` — Full markdown versions of all referenced academic papers. Each subfolder contains a `paper.md`:
+     - `jaques_2019_social_influence/` — Social Influence as Intrinsic Motivation (ICML 2019, Best Paper HM)
+     - `baker_2019_hide_and_seek/` — Emergent Tool Use from Multi-Agent Autocurricula (ICLR 2020)
+     - `jaderberg_2019_ftw/` — Human-level CTF with population-based RL, FTW agent (Science 2019)
+     - `mappo_yu_2021/` — The Surprising Effectiveness of PPO in Cooperative MARL / MAPPO (NeurIPS 2022)
+     - `rashid_2018_qmix/` — QMIX: Monotonic Value Function Factorisation (ICML 2018)
+     - `wang_2019_altruism/` — Evolving Intrinsic Motivations for Altruistic Behavior (AAMAS 2019)
+     - `levin_2022_tame/` — Technological Approach to Mind Everywhere, TAME (Frontiers 2022)
+     - `hoel_2025_causal_emergence/` — Causal Emergence 2.0: Quantifying Emergent Complexity (2025)
+     - `tangential_action_spaces_2025/` — Tangential Action Spaces: geometry and memory in embodied agents (2025)
+     - `barrett_stone_ad_hoc_teamwork/` — Ad Hoc Teamwork / zero-shot coordination (Barrett & Stone)
 6. **Verify cogames is installed**: `uv run python -c "import cogames; print('ok')"`. If not: `uv pip install -e ~/Projects/cogames`
 7. **Create a GitHub Discussion** for this session:
    ```bash
