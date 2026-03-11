@@ -20,14 +20,14 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
-TIME_BUDGET = 600  # 10-minute experiments — sweet spot between fast and farming
+TIME_BUDGET = 300  # 5-minute first probe — find heart-chain signal
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2", "role_conditional", "penalize_vibe_change", "miner", "scout"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -38,14 +38,14 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
-BPTT_HORIZON = 128  # longer memory for multi-step resource planning
+BPTT_HORIZON = 128  # longer memory for multi-step deposit→heart chain
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
 DEVICE = "auto"  # auto, cpu, cuda, mps
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout ent_coef=0.05 vf_coef=4.0 bptt=128 10min — no aligner, sweet spot"
+DESCRIPTION = "milestones_2:25 + role_conditional + penalize_vibe_change ent=0.1 5min — clean no miner/scout stacking heart-chain"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -79,7 +79,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
-        train_args['ent_coef'] = 0.05
+        train_args['ent_coef'] = 0.1   # higher entropy to explore deposit→heart chain
         train_args['vf_coef'] = 4.0
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL

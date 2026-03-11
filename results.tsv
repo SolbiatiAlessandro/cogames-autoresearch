@@ -55,3 +55,4 @@ e3b2a41	80.389570	80.389570	0.000	keep	milestones + role_conditional + penalize_
 e3b2a41	80.389570	80.389570	0.000	discard	milestones + role_conditional + penalize_vibe_change + scout (no credit)
 e8a1f18	0.000000	0.000000	0.000	crash	milestones + role_conditional + credit + scout (no penalize_vibe_change)
 d4da31b	322.241272	322.241272	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout
+2c9c542	5.175234	5.175234	0.000	keep	milestones_2:25 + role_conditional + penalize_vibe_change ent=0.1 5min — clean no miner/scout stacking heart-chain	2026-03-11T06:23:08	312			158.5	0.0	71240.8	0.0	0.0	208348.3	1.0	932.6	597.6	0.0	6.0	6.7	8.5	5.9	5.2	1.0	0.3	0.2	0.3	0.2
