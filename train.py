@@ -20,14 +20,14 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
-TIME_BUDGET = 300  # 5-min exp 6: aligner standalone to ALL agents — force alignment discovery
+TIME_BUDGET = 600  # 10-min exp 7: back to exp1 clean config, longer to stabilize aligned>0
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change", "aligner"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -47,7 +47,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones + milestones_2:25 + role_cond + penalize_vibe + aligner 5min — aligner reward ALL agents to force alignment discovery"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe 10min ent=0.10 — exact exp1 config at 2x budget"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
