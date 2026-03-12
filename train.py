@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 600  # 10-min exp 11: transfer tutorial formula to main mission + scrambler
+TIME_BUDGET = 600  # 10-min exp 12: add milestones_2:25 compounding to working formula
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones", "aligner", "scrambler", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "milestones", "aligner", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -48,7 +48,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "main_mission milestones + aligner + scrambler + credit ent=0.15 10min — transfer tutorial formula, add scrambler for clips"
+DESCRIPTION = "milestones_2:25 + milestones + aligner + credit ent=0.15 10min — compounding + direct alignment + gear bootstrap"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
