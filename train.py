@@ -20,14 +20,14 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
-TIME_BUDGET = 300  # 5-minute exp 1: clean config, look for heart_amount > 0
+TIME_BUDGET = 600  # 10-minute exp 2: scale to milestones_2:50
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:50", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -47,7 +47,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_conditional + penalize_vibe_change ent_coef=0.10 5min — clean no miner/scout, hunting hearts"
+DESCRIPTION = "milestones_2:50 + role_conditional + penalize_vibe_change ent_coef=0.10 10min — stronger objective, scale hearts"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants

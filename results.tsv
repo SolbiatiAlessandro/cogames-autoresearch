@@ -56,3 +56,4 @@ e3b2a41	80.389570	80.389570	0.000	discard	milestones + role_conditional + penali
 e8a1f18	0.000000	0.000000	0.000	crash	milestones + role_conditional + credit + scout (no penalize_vibe_change)
 d4da31b	322.241272	322.241272	0.000	keep	milestones + role_conditional + penalize_vibe_change + credit + scout
 9dfaf64	71.194595	71.194595	0.000	keep	milestones_2:25 + role_conditional + penalize_vibe_change ent_coef=0.10 5min — clean no miner/scout, hunting hearts	2026-03-12T06:29:02	311			257.0	0.0	1191719.2	0.1	0.0	2651983.5	4.5	4692.1	3515.2	0.0	2.0	4.4	4.8	6.0	10.9	1.8	0.3	0.4	0.4	0.3
+5b28400	51.144032	51.144032	0.000	keep	milestones_2:50 + role_conditional + penalize_vibe_change ent_coef=0.10 10min — stronger objective, scale hearts	2026-03-12T06:40:12	615			0.0	0.0	1202056.2	0.0	0.0	2156284.5	2.0	4493.9	3654.6	0.0	1.0	11.4	12.5	12.6	11.6	1.6	0.2	0.2	0.2	0.1
