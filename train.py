@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 600  # 10-min exp 12: add milestones_2:25 compounding to working formula
+TIME_BUDGET = 1200  # 20-min exp 13: scale up best formula
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -36,7 +36,7 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.002  # scaled for 20min budget
 MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
 BPTT_HORIZON = 128  # longer memory for multi-step resource planning
@@ -48,7 +48,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + milestones + aligner + credit ent=0.15 10min — compounding + direct alignment + gear bootstrap"
+DESCRIPTION = "milestones_2:25 + milestones + aligner + credit ent=0.15 20min lr=0.002 — scale up best formula"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
