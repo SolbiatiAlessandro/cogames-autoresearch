@@ -43,6 +43,8 @@ NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real l
 
 # Hardware
 DEVICE = "auto"  # auto, cpu, cuda, mps
+VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core machine → OOM/hang)
+VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
 DESCRIPTION = "milestones_2 + role_conditional + penalize_vibe_change + miner + scout ent_coef=0.05 vf_coef=4.0 bptt=128 10min — no aligner, sweet spot"
@@ -103,6 +105,8 @@ train_module.train(
     minibatch_size=minibatch_size,
     log_outputs=True,
     checkpoint_interval=10,
+    vector_num_envs={vector_num_envs!r},
+    vector_num_workers={vector_num_workers!r},
 )
 """
 
@@ -120,6 +124,8 @@ def build_train_command():
         learning_rate=LEARNING_RATE,
         gamma=GAMMA,
         bptt_horizon=BPTT_HORIZON,
+        vector_num_envs=VECTOR_NUM_ENVS,
+        vector_num_workers=VECTOR_NUM_WORKERS,
     )
     return ["uv", "run", "python", "-c", script]
 

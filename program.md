@@ -145,6 +145,8 @@ To check what device you're on:
 uv run python -c "import torch; print('cuda' if torch.cuda.is_available() else 'cpu', getattr(torch.cuda, 'get_device_name', lambda i: 'n/a')(0) if torch.cuda.is_available() else '')"
 ```
 
+**⚠️ Do not remove `VECTOR_NUM_ENVS` / `VECTOR_NUM_WORKERS` from train.py.** On machines with many cores, the auto-detection scales to 48+ workers and 288+ envs, which causes training to hang or OOM before a single step runs. The safe defaults (64 envs, 8 workers) are already set. See `knowledge/memory_issues.md` for the full explanation.
+
 ## ⚠️ What "Better" means
 
 **DO NOT blindly optimize composite_score.** It sums ALL reward variant signals and is easily gamed — agents score 200+ by collecting resources while holding ZERO territory.
