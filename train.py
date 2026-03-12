@@ -28,7 +28,7 @@ TIME_BUDGET = 300  # 5-min exp 9: aligner tutorial, no clips = much easier to di
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones", "aligner", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -48,7 +48,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "aligner_tutorial milestones_2:25 + role_cond + penalize_vibe 5min — no clips, learn alignment chain"
+DESCRIPTION = "aligner_tutorial milestones + aligner + credit ent=0.15 5min — direct alignment reward + gear pickup + heart bootstrap"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -82,7 +82,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
-        train_args['ent_coef'] = 0.10
+        train_args['ent_coef'] = 0.15
         train_args['vf_coef'] = 4.0
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
