@@ -20,14 +20,14 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
-TIME_BUDGET = 600  # 10-minute exp 4: add credit for heart pickup bootstrap
+TIME_BUDGET = 600  # 10-minute exp 5: milestones direct alignment reward + milestones_2:25
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -47,7 +47,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_conditional + penalize_vibe_change + credit ent_coef=0.10 10min — credit boosts heart/gear pickup"
+DESCRIPTION = "milestones + milestones_2:25 + role_conditional + penalize_vibe 10min — direct alignment reward (1.0/align) + compounding"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
