@@ -19,8 +19,9 @@ import sys
 import time
 from datetime import datetime
 
-from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION, compute_composite_score
-TIME_BUDGET = 600  # 10-min exp 7: back to exp1 clean config, longer to stabilize aligned>0
+from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
+MISSION = "training_facility_open_1"  # tiny map diagnostic — easier to discover alignment chain
+TIME_BUDGET = 300  # 5-min exp 8: tiny map, 2 agents, fast alignment chain discovery
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -28,7 +29,7 @@ TIME_BUDGET = 600  # 10-min exp 7: back to exp1 clean config, longer to stabiliz
 
 # Mission and reward setup
 REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
-NUM_AGENTS = 4
+NUM_AGENTS = 2  # training_facility_open_1 is 2-agent mission
 
 # Policy
 HIDDEN_SIZE = 256
@@ -47,7 +48,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (default auto-scales to 288 on 96-core ma
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe 10min ent=0.10 — exact exp1 config at 2x budget"
+DESCRIPTION = "training_facility_open_1 milestones_2:25 + role_cond + penalize_vibe 5min — tiny map diagnostic for alignment chain"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
