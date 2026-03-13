@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 600  # 10-min exp 16: add role_conditional to best formula
+TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "milestones", "role_conditional", "aligner", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "milestones", "role_conditional", "penalize_vibe_change", "aligner"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -48,7 +48,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + milestones + role_cond + aligner + credit ent=0.15 10min — role specialization on best formula"
+DESCRIPTION = "milestones_2:25 + milestones + role_cond + penalize_vibe + aligner ent=0.10 10min — breakthrough formula + milestones + aligner"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -82,7 +82,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
-        train_args['ent_coef'] = 0.15
+        train_args['ent_coef'] = 0.10
         train_args['vf_coef'] = 4.0
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
