@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 10min — longer GAE + longer discount on best junction config"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 epochs=2 10min — 2x PPO updates on best junction config"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -87,7 +87,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = 0.15  # high entropy for junction exploration
         train_args['clip_coef'] = 0.2
-        train_args['update_epochs'] = 1
+        train_args['update_epochs'] = 2  # more gradient steps to reinforce junction-holding
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
