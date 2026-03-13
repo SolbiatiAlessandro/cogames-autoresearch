@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 clip=0.15 10min — tighter PPO clipping for more conservative stable updates"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.08 10min — lower entropy for more exploitation of heart/alignment strategies"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -85,8 +85,8 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
-        train_args['ent_coef'] = 0.10
-        train_args['clip_coef'] = 0.15
+        train_args['ent_coef'] = 0.08
+        train_args['clip_coef'] = 0.2
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
