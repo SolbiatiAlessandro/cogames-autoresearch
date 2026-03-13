@@ -28,7 +28,7 @@ TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "milestones", "role_conditional", "penalize_vibe_change", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -39,6 +39,7 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
+GAE_LAMBDA = 0.95  # up from default 0.90 — longer credit assignment horizon
 BPTT_HORIZON = 128  # default sweet spot
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -48,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + milestones + role_cond + penalize_vibe + credit ent=0.10 10min — hearts formula + credit for gear bootstrap"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 gae=0.95 10min — clean breakthrough + longer GAE horizon"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -75,6 +76,7 @@ checkpoints = {checkpoints!r}
 learning_rate = {learning_rate!r}
 gamma = {gamma!r}
 bptt_horizon = {bptt_horizon!r}
+gae_lambda = {gae_lambda!r}
 
 _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
@@ -82,6 +84,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
+        train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = 0.10
         train_args['vf_coef'] = 4.0
         super().__init__(train_args, *args, **kwargs)
@@ -125,6 +128,7 @@ def build_train_command():
         learning_rate=LEARNING_RATE,
         gamma=GAMMA,
         bptt_horizon=BPTT_HORIZON,
+        gae_lambda=GAE_LAMBDA,
         vector_num_envs=VECTOR_NUM_ENVS,
         vector_num_workers=VECTOR_NUM_WORKERS,
     )
