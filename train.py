@@ -39,7 +39,7 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
-GAE_LAMBDA = 0.95  # up from default 0.90 — longer credit assignment horizon
+GAE_LAMBDA = 0.90  # back to default — GAE=0.95 didn't help
 BPTT_HORIZON = 128  # default sweet spot
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 gae=0.95 10min — clean breakthrough + longer GAE horizon"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 10min — higher entropy for alignment chain exploration"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -85,7 +85,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
-        train_args['ent_coef'] = 0.10
+        train_args['ent_coef'] = 0.15
         train_args['vf_coef'] = 4.0
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
