@@ -28,7 +28,7 @@ TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 10min — high entropy + longer discount horizon for junction holding"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe + credit ent=0.15 gamma=0.999 10min — credit bootstrap on best junction config"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
