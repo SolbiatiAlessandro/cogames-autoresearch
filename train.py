@@ -28,7 +28,7 @@ TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -39,7 +39,7 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
-GAE_LAMBDA = 0.90  # back to default — GAE=0.95 didn't help
+GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
 BPTT_HORIZON = 128  # default sweet spot
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones + milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 10min — direct align/scramble reward on best junction config"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 10min — longer GAE + longer discount on best junction config"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
