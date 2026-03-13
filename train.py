@@ -37,7 +37,7 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 LEARNING_RATE = 0.001
-MINIBATCH_SIZE = 4096
+MINIBATCH_SIZE = 8192
 GAMMA = 0.995  # default
 GAE_LAMBDA = 0.90  # back to default — GAE=0.95 didn't help
 BPTT_HORIZON = 128  # default sweet spot
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 mb=4096 10min — smaller minibatch for 2x more gradient updates per rollout"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 clip=0.15 10min — tighter PPO clipping for more conservative stable updates"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -86,6 +86,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = 0.10
+        train_args['clip_coef'] = 0.15
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
