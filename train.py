@@ -243,8 +243,8 @@ def log_to_results_tsv(
                     "memory_gb",
                     "status",
                     "description",
-                    "timestamp",
                     "e2e_seconds",
+                    "api_cost_usd",
                     "session_tokens_cumulative",
                     "session_cost_cumulative",
                 ]
@@ -258,8 +258,8 @@ def log_to_results_tsv(
                 f"{memory_gb:.3f}",
                 status,
                 description,
-                datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
                 f"{e2e_seconds:.0f}",
+                ""  # api_cost_usd — filled by agent,
                 "",  # session_tokens_cumulative — filled by agent
                 "",  # session_cost_cumulative — filled by agent
             ]
