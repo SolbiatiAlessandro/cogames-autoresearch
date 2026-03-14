@@ -18,6 +18,12 @@ CHECKPOINT_DIR="$REPO/checkpoints"
 
 AGENT_TIMEOUT=2400
 
+# === RESEARCH DIRECTION ===
+# Set this before starting the loop. Claude will read it as its research brief.
+# Example: "Focus on longer training runs (20-30 min) on the best hearts config.
+#           Try CNN+LSTM architecture. Keep VECTOR_NUM_ENVS=64, VECTOR_NUM_WORKERS=8."
+RESEARCH_DIRECTION="${RESEARCH_DIRECTION:-Read the GitHub Discussion for the current branch to find the research direction. Build on what worked. Iterate incrementally.}"
+
 # Ensure uv and other local bins are on PATH (needed on RunPod)
 export PATH="$HOME/.local/bin:$PATH"
 export UV_LINK_MODE=copy
@@ -142,6 +148,9 @@ while true; do
     PROMPT="You are an autonomous RL researcher running ONE experiment iteration on the CoGames autoresearch project.
 
 Working directory: $REPO (you are already here)
+
+=== RESEARCH DIRECTION (from Alessandro) ===
+${RESEARCH_DIRECTION}
 
 Read program.md — it is the single source of truth for how to run experiments. Follow it exactly.
 
