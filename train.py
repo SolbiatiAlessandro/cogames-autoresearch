@@ -36,7 +36,7 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0015
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 vf_coef=1.0 10min — lower vf weight on best junction config for more policy freedom"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 lr=0.0015 10min — higher LR on best junction config for faster strategy learning"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -87,7 +87,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = 0.15  # high entropy for junction exploration
         train_args['clip_coef'] = 0.2
-        train_args['vf_coef'] = 1.0  # lower vf weight: more policy freedom
+        train_args['vf_coef'] = 2.0  # default vf weight
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
