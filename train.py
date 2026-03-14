@@ -28,7 +28,7 @@ TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -40,8 +40,8 @@ LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
-BPTT_HORIZON = 128  # default sweet spot
-ENT_COEF = 0.10  # heart-producing entropy from breakthrough config
+BPTT_HORIZON = 64  # default BPTT
+ENT_COEF = 0.15  # higher entropy for junction exploration
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -50,7 +50,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.999 gae=0.95 10min — hearts entropy + junction hyperparams"
+DESCRIPTION = "milestones + milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 10min — milestones on best junction config (1029.8 junctions at ent=0.15)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
