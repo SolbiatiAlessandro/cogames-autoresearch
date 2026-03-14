@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 bptt=256 10min — longer LSTM temporal memory for multi-step alignment chain"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 bptt=256 10min | score=54.1 | junctions=0.0 | aligned=0.0 | status=discard"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
