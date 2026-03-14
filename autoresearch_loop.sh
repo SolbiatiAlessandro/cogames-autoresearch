@@ -143,20 +143,7 @@ while true; do
 
 Working directory: $REPO (you are already here)
 
-=== RESEARCH BRIEF (from Alessandro) ===
-Continue the research direction from yesterday's 12-march-night session.
-The breakthrough config was: milestones_2:25 + role_conditional + penalize_vibe_change, ent_coef=0.10
-It achieved hearts (1.8) and aligned junctions (0.1) for the first time.
-Build incrementally on what's working. Try small variations and tweaks.
-Do NOT make radical changes — iterate on the winning formula.
-
-=== MEMORY SAFETY (CRITICAL) ===
-This is a RunPod pod. Last session OOMed and killed the pod.
-- Use VECTOR_NUM_ENVS=64, VECTOR_NUM_WORKERS=8 (DO NOT increase these)
-- Before running train.py, check memory: awk '/MemAvailable/ {printf \"%.1fGB\", \$2/1024/1024}' /proc/meminfo
-- If available memory < 30GB, report CRITICALLY_BLOCKED: low memory
-- After training, check memory again. If it dropped below 20GB, report it.
-- NEVER increase batch sizes or env counts beyond what's already in train.py.
+Read program.md — it is the single source of truth for how to run experiments. Follow it exactly.
 
 === CURRENT STATE ===
 $(git log --oneline -8 2>/dev/null)
@@ -166,35 +153,8 @@ $(cat results.tsv 2>/dev/null || echo 'no results yet')
 
 === CURRENT BEST SCORE: ${BEST_SCORE} ===
 
-=== YOUR TASK: Run ONE complete experiment iteration ===
-
-Follow program.md exactly. Summary of the loop:
-1. Read program.md, knowledge/reward_variants.md, knowledge/training_tips.md
-2. Look at results above — pick ONE new experiment idea NOT already tried
-3. Build on the breakthrough: milestones_2:25 + role_conditional + penalize_vibe_change, ent_coef=0.10
-4. Small incremental changes only. Tweak one thing at a time.
-5. TIME BUDGET: default 600s. You may use 600 or 1200 max.
-   If you increase TIME_BUDGET, also adjust the LR schedule.
-6. Modify train.py (ONLY this file)
-7. git add train.py results.tsv && git commit -m 'experiment: <description>'
-8. Run: uv run train.py > run.log 2>&1 (WAIT for completion)
-9. Check results: grep '^composite_score:\|^mean_reward:' run.log
-10. If crash: tail -50 run.log, fix train.py, retry up to 2 times
-11. Log to results.tsv
-12. git add train.py results.tsv && git commit with status=keep or status=discard
-    Do NOT use git reset --hard. Always commit with the result for history.
-13. git push
-14. Update the GitHub Discussion AND local results/discussion_<branch>.md after EVERY experiment.
-    Add a one-line entry to the Experiment Log section with: commit, score, key metrics, and your interpretation.
-    Get the discussion node ID via:
-    gh api graphql -f query='{ repository(owner:"SolbiatiAlessandro", name:"cogames-autoresearch") { discussions(first:3, orderBy:{field:CREATED_AT, direction:DESC}) { nodes { id number title } } } }'
-    Then update with the GraphQL updateDiscussion mutation (update the full body with the new log entry appended).
-    Always write to results/discussion_<branch>.md locally first, then post to GitHub.
-15. End your response with exactly one of:
-    EXPERIMENT_DONE: score=<score> status=keep|discard|crash description=<what you tried>
-    CRITICALLY_BLOCKED: <reason>
-
-DO NOT stop, DO NOT ask questions. Run the full experiment end-to-end."
+Run ONE complete experiment iteration end-to-end as described in program.md.
+End with EXPERIMENT_DONE or CRITICALLY_BLOCKED as specified in program.md."
 
     log "Spawning Claude Code for experiment #$experiment_count (timeout: ${AGENT_TIMEOUT}s)..."
 

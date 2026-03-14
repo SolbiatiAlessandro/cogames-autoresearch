@@ -117,7 +117,7 @@ LOOP FOREVER:
    ```
    If there are new human comments, read them carefully — they may contain steering instructions, new hypotheses to try, or questions. Incorporate them into your next experiment if relevant.
 
-10. **Update the GitHub Discussion AND the local file** when you have an interesting finding — a breakthrough, a surprising failure, a new insight. Not every experiment. Keep it concise and useful for future sessions.
+10. **Update the GitHub Discussion AND the local file after EVERY experiment.** Add a one-line entry to the Experiment Log section with: commit hash, score, key metrics (junctions, aligned_by_agent, heart_amount), and your one-line interpretation. Keep it concise — this is the running log future sessions will read.
    - Always write to `results/discussion_<branch>.md` locally (this survives even if GitHub is unreachable)
    - Also post to GitHub Discussion via GraphQL:
    ```bash
@@ -129,6 +129,25 @@ LOOP FOREVER:
 10. Go to 1.
 
 **NEVER STOP.** Do not pause to ask questions. There is no human listening. You are autonomous. If you run out of ideas, re-read the GitHub Discussions and `knowledge/`, combine near-misses, try radical changes. The loop runs until the human kills your process.
+
+## Memory Safety (RunPod)
+
+Before and after every `uv run train.py`, check available memory:
+```bash
+awk '/MemAvailable/ {printf "%.1fGB", $2/1024/1024}' /proc/meminfo
+```
+- If available memory < 30GB before a run: **do not run** — report `CRITICALLY_BLOCKED: low memory`
+- If it drops below 20GB after a run: log it and run `cleanup_processes` before next experiment
+- **Never increase** `VECTOR_NUM_ENVS` or `VECTOR_NUM_WORKERS` beyond the defaults (64 / 8)
+
+## Exit Signals (when invoked by autoresearch_loop.sh)
+
+When the bash loop spawns you for ONE experiment iteration, end your response with exactly one of:
+```
+EXPERIMENT_DONE: score=<X> status=keep|discard|crash description=<what you tried>
+CRITICALLY_BLOCKED: <reason>
+```
+The bash loop parses these to track progress and detect failures. Always include one at the end.
 
 ## What you CAN and CANNOT do
 
