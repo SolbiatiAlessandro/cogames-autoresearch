@@ -184,7 +184,13 @@ Follow program.md exactly. Summary of the loop:
 12. git add train.py results.tsv && git commit with status=keep or status=discard
     Do NOT use git reset --hard. Always commit with the result for history.
 13. git push
-14. End your response with exactly one of:
+14. Update the GitHub Discussion AND local results/discussion_<branch>.md after EVERY experiment.
+    Add a one-line entry to the Experiment Log section with: commit, score, key metrics, and your interpretation.
+    Get the discussion node ID via:
+    gh api graphql -f query='{ repository(owner:"SolbiatiAlessandro", name:"cogames-autoresearch") { discussions(first:3, orderBy:{field:CREATED_AT, direction:DESC}) { nodes { id number title } } } }'
+    Then update with the GraphQL updateDiscussion mutation (update the full body with the new log entry appended).
+    Always write to results/discussion_<branch>.md locally first, then post to GitHub.
+15. End your response with exactly one of:
     EXPERIMENT_DONE: score=<score> status=keep|discard|crash description=<what you tried>
     CRITICALLY_BLOCKED: <reason>
 
