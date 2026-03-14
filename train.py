@@ -28,7 +28,7 @@ TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -40,7 +40,7 @@ LEARNING_RATE = 0.00092
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
-BPTT_HORIZON = 256  # longer temporal memory for multi-step alignment chain
+BPTT_HORIZON = 64  # default BPTT
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 bptt=256 10min | score=54.1 | junctions=0.0 | aligned=0.0 | status=discard"
+DESCRIPTION = "milestones + milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.999 gae=0.95 10min — hearts entropy + junction hyperparams + direct align reward"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -85,7 +85,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
-        train_args['ent_coef'] = 0.15  # high entropy for junction exploration
+        train_args['ent_coef'] = 0.10  # hearts-optimal entropy
         train_args['clip_coef'] = 0.2
         train_args['vf_coef'] = 2.0  # default vf weight
         train_args['update_epochs'] = 1
