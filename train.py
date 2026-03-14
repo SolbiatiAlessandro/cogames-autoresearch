@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
+TIME_BUDGET = 1200  # 20-min: extended training on best junction config
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change", "credit"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones", "milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
 NUM_AGENTS = 4
 
 # Policy
@@ -36,7 +36,7 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-LEARNING_RATE = 0.00092
+LEARNING_RATE = 0.0015
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
@@ -49,7 +49,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones + milestones_2:25 + role_cond + penalize_vibe + credit ent=0.10 gamma=0.999 gae=0.95 10min — credit bootstrap on best scoring combo"
+DESCRIPTION = "milestones + milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.999 gae=0.95 lr=0.0015 20min — extended training on best junction config (111.2 junctions)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
