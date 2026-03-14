@@ -8,15 +8,20 @@
 # - Updated best score reference
 # =============================================================================
 
-REPO="$HOME/Projects/cogames-autoresearch"
+REPO="/workspace/cogames-autoresearch"
 LOG="$REPO/autoresearch_loop.log"
 PID_FILE="$REPO/autoresearch_loop.pid"
-OPENCLAW_BIN="/opt/homebrew/bin/openclaw"
-CLAUDE_BIN="$HOME/.local/bin/claude"
+OPENCLAW_BIN="$(which openclaw 2>/dev/null || echo /usr/local/bin/openclaw)"
+CLAUDE_BIN="$(which claude 2>/dev/null || echo /usr/bin/claude)"
 WHATSAPP_NUMBER="+12065321138"
 CHECKPOINT_DIR="$REPO/checkpoints"
 
 AGENT_TIMEOUT=2400
+
+# Ensure uv and other local bins are on PATH (needed on RunPod)
+export PATH="$HOME/.local/bin:$PATH"
+export UV_LINK_MODE=copy
+export GH_TOKEN="${GH_TOKEN:-}"
 
 cd "$REPO"
 mkdir -p "$CHECKPOINT_DIR"
@@ -39,6 +44,8 @@ cleanup_processes() {
     pkill -f "train\.py" 2>/dev/null || true
     pkill -f "pufferlib" 2>/dev/null || true
     sleep 5
+    # Clear any leaked GPU memory
+    python3 -c "import torch; torch.cuda.empty_cache()" 2>/dev/null || true
     log "Process cleanup done."
 }
 
@@ -136,6 +143,21 @@ while true; do
 
 Working directory: $REPO (you are already here)
 
+=== RESEARCH BRIEF (from Alessandro) ===
+Continue the research direction from yesterday's 12-march-night session.
+The breakthrough config was: milestones_2:25 + role_conditional + penalize_vibe_change, ent_coef=0.10
+It achieved hearts (1.8) and aligned junctions (0.1) for the first time.
+Build incrementally on what's working. Try small variations and tweaks.
+Do NOT make radical changes — iterate on the winning formula.
+
+=== MEMORY SAFETY (CRITICAL) ===
+This is a RunPod pod. Last session OOMed and killed the pod.
+- Use VECTOR_NUM_ENVS=64, VECTOR_NUM_WORKERS=8 (DO NOT increase these)
+- Before running train.py, check memory: awk '/MemAvailable/ {printf \"%.1fGB\", \$2/1024/1024}' /proc/meminfo
+- If available memory < 30GB, report CRITICALLY_BLOCKED: low memory
+- After training, check memory again. If it dropped below 20GB, report it.
+- NEVER increase batch sizes or env counts beyond what's already in train.py.
+
 === CURRENT STATE ===
 $(git log --oneline -8 2>/dev/null)
 
@@ -149,22 +171,20 @@ $(cat results.tsv 2>/dev/null || echo 'no results yet')
 Follow program.md exactly. Summary of the loop:
 1. Read program.md, knowledge/reward_variants.md, knowledge/training_tips.md
 2. Look at results above — pick ONE new experiment idea NOT already tried
-3. The best combo so far: milestones + role_conditional + penalize_vibe_change + credit + scout (score 234.0)
-4. Be creative — explore new hyperparams, architecture, variant combos, or revisit promising ideas with tweaks.
-5. TIME BUDGET: You may change TIME_BUDGET in train.py by monkey-patching:
-   Add near top of main(): import prepare; prepare.TIME_BUDGET = <seconds>
-   Default is 600s. You may use 600, 1200, or 1800.
-   IMPORTANT: If you increase TIME_BUDGET, also adjust the LR schedule —
-   the default schedule decays LR to near-zero at 600s. For longer runs,
-   you may need to increase the learning rate or use a different schedule.
+3. Build on the breakthrough: milestones_2:25 + role_conditional + penalize_vibe_change, ent_coef=0.10
+4. Small incremental changes only. Tweak one thing at a time.
+5. TIME BUDGET: default 600s. You may use 600 or 1200 max.
+   If you increase TIME_BUDGET, also adjust the LR schedule.
 6. Modify train.py (ONLY this file)
-7. git add train.py && git commit -m 'experiment: <description>'
+7. git add train.py results.tsv && git commit -m 'experiment: <description>'
 8. Run: uv run train.py > run.log 2>&1 (WAIT for completion)
 9. Check results: grep '^composite_score:\|^mean_reward:' run.log
 10. If crash: tail -50 run.log, fix train.py, retry up to 2 times
 11. Log to results.tsv
-12. If score > ${BEST_SCORE}: KEEP commit. Otherwise: git reset --hard HEAD~1
-13. End your response with exactly one of:
+12. git add train.py results.tsv && git commit with status=keep or status=discard
+    Do NOT use git reset --hard. Always commit with the result for history.
+13. git push
+14. End your response with exactly one of:
     EXPERIMENT_DONE: score=<score> status=keep|discard|crash description=<what you tried>
     CRITICALLY_BLOCKED: <reason>
 
@@ -206,9 +226,6 @@ DO NOT stop, DO NOT ask questions. Run the full experiment end-to-end."
         consecutive_crashes=0
         DONE_LINE=$(echo "$AGENT_OUTPUT" | grep "EXPERIMENT_DONE" | head -1 || echo "")
         log "Experiment #$experiment_count complete. $DONE_LINE"
-
-        # Sync to Notion
-        bash "$REPO/sync_notion.sh" >> "$LOG" 2>&1 &
 
         # Push results to GitHub
         cd "$REPO" && git push >> "$LOG" 2>&1 || true
