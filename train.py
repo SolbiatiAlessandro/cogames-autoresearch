@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 600  # 10-min: breakthrough + milestones + aligner
+TIME_BUDGET = 1200  # 20-min: scale best junction config for longer training
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # available: objective, milestones, milestones_2, milestones_2:N, credit, miner, aligner, scrambler, scout, role_conditional, penalize_vibe_change
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # best junction config from prior sessions
 NUM_AGENTS = 4
 
 # Policy
@@ -36,7 +36,7 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.001  # original LR — lr=0.002 caused instability at 20min, revert to default
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
@@ -50,7 +50,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 vf_coef=1.0 10min — lower vf weight for more policy freedom on best junction config"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 20min lr=0.001 — revert to original LR, avoid instability at 20min"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -88,7 +88,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = {ent_coef!r}
         train_args['clip_coef'] = 0.2
-        train_args['vf_coef'] = 1.0
+        train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
