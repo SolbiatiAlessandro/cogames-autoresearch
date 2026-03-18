@@ -35,15 +35,17 @@ NUM_AGENTS = 4
 HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
-# Training hyperparameters — PBT-validated: cycle 1 winner (Agent 1) had these hyperparams
-# PBT run found: policy_lr=0.0013, value_lr=0.0006, ent=0.159, gae=0.95 → best performance
-LEARNING_RATE = 0.0013  # PBT-selected: lower than default (0.001→0.0013 via selection)
-VALUE_LR = 0.0006       # PBT-selected: separate value LR (dual LR setup)
+# Training hyperparameters
+# Combining two findings:
+# 1. Parallel loop: ent=0.10 scored 73.5 (best 20min score ever) vs ent=0.15=54.6
+# 2. PBT: dual LR (policy/value separate) prevents entropy collapse in long runs
+LEARNING_RATE = 0.001   # baseline LR (parallel loop used this and got 73.5 with ent=0.10)
+VALUE_LR = 0.0003       # separate value LR: 3× lower than policy LR (PBT insight)
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
-GAE_LAMBDA = 0.95  # PBT-selected: gae=0.95 beat gae=0.98 in cycle 1 winner
+GAE_LAMBDA = 0.95  # best from prior experiments
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot (541 junctions vs 162 for BPTT=128)
-ENT_COEF = 0.159  # PBT-selected: 0.159 from cycle 1 winning agent (Agent 1)
+ENT_COEF = 0.10   # parallel loop winner: ent=0.10 → 73.5 (vs 0.15 → 54.6, 0.20 → 60.3)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -52,7 +54,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe PBT-validated hyperparams: lr=0.0013 value_lr=0.0006 ent=0.159 gae=0.95 bptt=64 20min — applying cycle1 winner hyperparams from PBT run (A1: best score 17.9, 134 junctions in 5min)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 + dual_LR(policy=0.001,value=0.0003) gae=0.95 bptt=64 20min — combining parallel-loop winner (ent=0.10→73.5) with PBT dual-LR insight to prevent value spikes"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
