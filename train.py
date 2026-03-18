@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20-min: test ent_coef=0.20 (vs 0.15 baseline) to combat entropy collapse
+TIME_BUDGET = 1200  # 20-min: test ent_coef=0.10 (lower than 0.15 baseline) to tighten focus on junction holding
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -41,7 +41,7 @@ MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot (541 junctions vs 162 for BPTT=128)
-ENT_COEF = 0.20  # increased entropy (0.20 vs 0.15) to combat entropy collapse in longer runs
+ENT_COEF = 0.10  # lower entropy (0.10 vs 0.15 baseline) — test if tighter exploration focus improves junction holding
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -50,7 +50,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.20 gamma=0.999 gae=0.95 20min lr=0.001 bptt=64 — higher entropy (0.20 vs 0.15 baseline) to combat entropy collapse, testing against ba53720 (541 junctions)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.999 gae=0.95 20min lr=0.001 bptt=64 — lower entropy (0.10 vs 0.15 baseline) to tighten junction focus, testing against ba53720 (541 junctions)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
