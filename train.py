@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: testing minibatch=16384 (double) to reduce gradient update frequency
+TIME_BUDGET = 1500  # 25min: step LR experiment
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -47,13 +47,15 @@ LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
 LR_WARMUP_DURATION = 0   # disabled
 VALUE_LR = 0.001         # same as policy LR
-MINIBATCH_SIZE = 16384  # EXPERIMENT: double minibatch → 1 gradient update per rollout (vs 2 currently)
+MINIBATCH_SIZE = 8192  # best known minibatch (16384 failed 27j, 4096 failed 54j)
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF_START = 0.10  # back to best ent (ent=0.05 at 25min → 0j FAIL; ent=0.10 is sweet spot)
+ENT_COEF_START = 0.10  # best ent
 ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
+LR_DROP_TIME = 1200    # after 20min, drop LR from 0.001 to 0.0001 (step LR)
+LR_FINAL = 0.0001      # LR for final 5min (10x reduction; keeps policy near 20min optimum)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -62,7 +64,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_conditional + penalize_vibe ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=16384 20min — double minibatch halves gradient updates per rollout; update_epochs=2 failed (more updates=bad), so fewer updates might help; baseline 20min=552j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + role_conditional + penalize_vibe ent=0.10 gamma=0.999 lr=0.001→0.0001 step@20min bptt=64 gae=0.95 minibatch=8192 25min — step LR: full 0.001 for 20min, drop 10x to 0.0001 for final 5min; cosine over 20min failed (394j); const 0.001 at 25min=390j; hypothesis: keep full LR for learning phase, tiny LR to consolidate without overtraining"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -97,6 +99,8 @@ gae_lambda = {gae_lambda!r}
 ent_start = {ent_start!r}
 ent_end = {ent_end!r}
 anneal_duration = {time_budget!r}
+lr_drop_time = {lr_drop_time!r}
+lr_final = {lr_final!r}
 
 _anneal_start_time = [None]  # mutable container to share across methods
 
@@ -115,8 +119,15 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         super().__init__(train_args, *args, **kwargs)
 
     def train(self):
-        # Constant LR (no warmup — warmup failed: 99.4j vs 390j baseline at 25min)
-        self.config["learning_rate"] = learning_rate
+        # Step LR: full LR for first 20min, then drop 10x for consolidation phase
+        if _anneal_start_time[0] is not None:
+            elapsed = _time_module.time() - _anneal_start_time[0]
+            if elapsed < lr_drop_time:
+                self.config["learning_rate"] = learning_rate  # 0.001 for first 20min
+            else:
+                self.config["learning_rate"] = lr_final  # 0.0001 for final 5min
+        else:
+            self.config["learning_rate"] = learning_rate
         # Constant entropy (no annealing — all annealing variants fail)
         if _anneal_start_time[0] is not None:
             frac = min(1.0, (_time_module.time() - _anneal_start_time[0]) / anneal_duration)
@@ -173,6 +184,8 @@ def build_train_command():
         vector_num_envs=VECTOR_NUM_ENVS,
         vector_num_workers=VECTOR_NUM_WORKERS,
         time_budget=TIME_BUDGET,
+        lr_drop_time=LR_DROP_TIME,
+        lr_final=LR_FINAL,
     )
     return ["uv", "run", "python", "-c", script]
 
