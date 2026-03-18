@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25-min: test ent=0.10 at 25min (best 20min config: 552.6j, ae6f8d2)
+TIME_BUDGET = 1200  # 20min: test update_epochs=2 at 20min (best 20min: 552.6j, ae6f8d2)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -37,7 +37,7 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64 → 552.6 junctions (ae6f8d2)
-# New experiment: extend best 20min config (ent=0.10) to 25min — does it maintain peak?
+# New experiment: update_epochs=2 at 20min — 2 PPO sweeps per rollout for better sample efficiency
 LEARNING_RATE = 0.001   # best from 20min experiments
 VALUE_LR = 0.001        # same as policy LR (no dual LR - dual LR hurt: junc=77 vs 166)
 MINIBATCH_SIZE = 8192
@@ -53,7 +53,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 25min — extend best 20min config (ent=0.10, 552.6j) to 25min; testing if lower entropy delays overtraining vs ent=0.15 collapse at 30min"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 update_epochs=2 20min — 2 PPO sweeps per rollout for better sample efficiency; baseline 20min=552.6j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -91,9 +91,9 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = {ent_coef!r}
-        train_args['clip_coef'] = 0.2  # standard PPO clip
+        train_args['clip_coef'] = 0.2  # standard PPO clip; update_epochs=2 for better sample efficiency
         train_args['vf_coef'] = 0.5
-        train_args['update_epochs'] = 1
+        train_args['update_epochs'] = 2
         super().__init__(train_args, *args, **kwargs)
         # Single LR: dual LR hurt with ent=0.10 (ev=-1.92, junc=77 vs 166).
 pufferl_module.PuffeRL = _PatchedPuffeRL
