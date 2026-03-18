@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: testing GAE_LAMBDA=0.98 (PBT session found population converges toward gae=0.98)
+TIME_BUDGET = 1500  # 25min: testing entropy annealing to combat overtraining (20min=552.6j, 25min=390.0j collapse)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -37,14 +37,18 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95 → 552.6 junctions (ae6f8d2)
-# New experiment: gae=0.98 at 20min — PBT found population converges toward gae=0.98; longer credit horizon for junction holding
+# New experiment: entropy annealing ent=0.15→0.05 over 25min to combat overtraining
+# Hypothesis: high entropy early = good exploration, low entropy late = stable junction-holding
+# Overtraining pattern: 20min=552j > 25min=390j > 30min=61j — policy deteriorates with longer training
 LEARNING_RATE = 0.001   # best LR from prior sessions (exhaustively tested)
 VALUE_LR = 0.001        # same as policy LR
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
-GAE_LAMBDA = 0.98  # EXPERIMENT: longer credit horizon (PBT session found population converges toward gae=0.98; default=0.95)
+GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF = 0.10  # best entropy from prior sessions (ent=0.10 → 552.6j at 20min)
+ENT_COEF_START = 0.15  # initial entropy — high exploration early (ent=0.15 → 541j at 20min)
+ENT_COEF_END = 0.05    # final entropy — low for stable exploitation late (well below tested ent=0.10)
+ENT_COEF = ENT_COEF_START  # placeholder for logging; actual annealing happens in train()
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -53,7 +57,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 gae=0.98 20min — longer credit horizon; PBT session found gae=0.98 is preferred; baseline 20min=552.6j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent_anneal={ENT_COEF_START}→{ENT_COEF_END} lr=0.001 bptt=64 gae=0.95 25min — entropy annealing to combat overtraining; baseline 20min=552.6j 25min=390.0j (ae6f8d2/4beabbb)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -61,6 +65,7 @@ DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.001 bpt
 
 TRAIN_SCRIPT = """
 import sys
+import time as _time_module
 from pathlib import Path
 from rich.console import Console
 from cogames.cli.mission import get_mission
@@ -82,19 +87,34 @@ value_lr = {value_lr!r}
 gamma = {gamma!r}
 bptt_horizon = {bptt_horizon!r}
 gae_lambda = {gae_lambda!r}
+ent_start = {ent_start!r}
+ent_end = {ent_end!r}
+anneal_duration = {time_budget!r}
+
+_anneal_start_time = [None]  # mutable container to share across methods
 
 _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
     def __init__(self, train_args, *args, **kwargs):
+        _anneal_start_time[0] = _time_module.time()
         train_args['learning_rate'] = learning_rate
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
-        train_args['ent_coef'] = {ent_coef!r}
+        train_args['ent_coef'] = ent_start  # start at high entropy
         train_args['clip_coef'] = 0.2  # best clip_coef from prior sessions
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
+
+    def train(self):
+        # Anneal ent_coef linearly: ent_start → ent_end over anneal_duration seconds
+        if _anneal_start_time[0] is not None:
+            frac = min(1.0, (_time_module.time() - _anneal_start_time[0]) / anneal_duration)
+            new_ent = ent_start + frac * (ent_end - ent_start)
+            self.config["ent_coef"] = new_ent
+        return super().train()
+
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
 name, env_cfg, _ = get_mission(mission)
@@ -137,7 +157,8 @@ def build_train_command():
         gamma=GAMMA,
         bptt_horizon=BPTT_HORIZON,
         gae_lambda=GAE_LAMBDA,
-        ent_coef=ENT_COEF,
+        ent_start=ENT_COEF_START,
+        ent_end=ENT_COEF_END,
         vector_num_envs=VECTOR_NUM_ENVS,
         vector_num_workers=VECTOR_NUM_WORKERS,
         time_budget=TIME_BUDGET,
