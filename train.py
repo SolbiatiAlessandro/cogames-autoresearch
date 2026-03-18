@@ -32,18 +32,19 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-HIDDEN_SIZE = 512  # Larger LSTM — testing if more capacity delays overtraining and allows longer useful learning
+HIDDEN_SIZE = 256  # back to best-known hidden size
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-# Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: hidden_size=512 (2x larger LSTM) at 20min
-# Hypothesis: larger model has more representational capacity, may plateau later,
-# enabling more stable long-run learning without the overtraining collapse we see at 25-30min.
+# Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
+# NEW EXPERIMENT: MINIBATCH_SIZE=4096 (half of 8192) at 20min
+# Hypothesis: smaller minibatch → more gradient updates per epoch → more learning signal per second.
+# With 64 envs and bptt=64, rollout = 64*64=4096 steps. minibatch=4096 means 1 full-rollout minibatch.
+# Smaller batches could help escape local optima and improve sample efficiency.
 # All other hyperparams kept at best-known values.
 LEARNING_RATE = 0.001   # best LR from prior sessions (exhaustively tested)
 VALUE_LR = 0.001        # same as policy LR
-MINIBATCH_SIZE = 8192
+MINIBATCH_SIZE = 4096
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
@@ -58,7 +59,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe hidden_size=512 ent=0.10 lr=0.001 bptt=64 gae=0.95 20min — larger LSTM (2x, 512 vs 256), all hyperparams at best-known; baseline 20min=552.6j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe minibatch=4096 ent=0.10 lr=0.001 bptt=64 gae=0.95 20min — half minibatch vs baseline (4096 vs 8192); more gradient updates per epoch; baseline 20min=552.6j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
