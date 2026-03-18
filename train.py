@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25-min: test clip_coef=0.1 + ent=0.15 to fight 30min overtraining
+TIME_BUDGET = 1500  # 25-min: test ent=0.10 at 25min (best 20min config: 552.6j, ae6f8d2)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -36,15 +36,15 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-# Best 20min config: ent=0.15 (HARD CONSTRAINT), single LR=0.001, BPTT=64 → 541 junctions (ba53720)
-# New experiment: clip_coef=0.1 (more conservative updates) + 25min to fight overtraining collapse
+# Best 20min config: ent=0.10, single LR=0.001, BPTT=64 → 552.6 junctions (ae6f8d2)
+# New experiment: extend best 20min config (ent=0.10) to 25min — does it maintain peak?
 LEARNING_RATE = 0.001   # best from 20min experiments
 VALUE_LR = 0.001        # same as policy LR (no dual LR - dual LR hurt: junc=77 vs 166)
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best from prior experiments
-BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot (541 junctions vs 162 for BPTT=128)
-ENT_COEF = 0.15   # HARD CONSTRAINT: only value that works (0.10→166j, 0.20→0j, 0.15→541j)
+BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
+ENT_COEF = 0.10   # best 20min: ent=0.10 → 552.6j (vs ent=0.15 → 541j)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -53,7 +53,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 clip_coef=0.1 lr=0.001 bptt=64 25min — conservative PPO clip to fight 30min overtraining; baseline 20min=541j, 30min=61j"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 25min — extend best 20min config (ent=0.10, 552.6j) to 25min; testing if lower entropy delays overtraining vs ent=0.15 collapse at 30min"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -91,7 +91,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = {ent_coef!r}
-        train_args['clip_coef'] = 0.1  # conservative: halve max policy update to fight overtraining
+        train_args['clip_coef'] = 0.2  # standard PPO clip
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
