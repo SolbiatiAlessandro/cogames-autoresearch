@@ -36,11 +36,11 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-LEARNING_RATE = 0.001  # original LR — lr=0.002 caused instability at 20min, revert to default
+LEARNING_RATE = 0.0015  # scaled for 20min: 1.5x original LR to keep learning active beyond 600s
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
-BPTT_HORIZON = 64  # default BPTT
+BPTT_HORIZON = 128  # same as best 10-min config (96b72bf) — 128 was the sweet spot for junction holding
 ENT_COEF = 0.15  # higher entropy for junction exploration
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -50,7 +50,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 20min lr=0.001 — revert to original LR, avoid instability at 20min"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 20min lr=0.0015 bptt=128 — scale LR 1.5x for 20min to keep learning beyond default 600s decay point"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
