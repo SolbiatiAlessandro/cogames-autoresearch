@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20-min: apply PBT-validated hyperparams
+TIME_BUDGET = 1500  # 25-min: test clip_coef=0.1 + ent=0.15 to fight 30min overtraining
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -36,16 +36,15 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-# Combining two findings:
-# 1. Parallel loop: ent=0.10 scored 73.5 (best 20min score ever) vs ent=0.15=54.6
-# 2. PBT: dual LR (policy/value separate) prevents entropy collapse in long runs
-LEARNING_RATE = 0.001   # baseline LR (parallel loop used this and got 73.5 with ent=0.10)
-VALUE_LR = 0.0003       # separate value LR: 3× lower than policy LR (PBT insight)
+# Best 20min config: ent=0.15 (HARD CONSTRAINT), single LR=0.001, BPTT=64 → 541 junctions (ba53720)
+# New experiment: clip_coef=0.1 (more conservative updates) + 25min to fight overtraining collapse
+LEARNING_RATE = 0.001   # best from 20min experiments
+VALUE_LR = 0.001        # same as policy LR (no dual LR - dual LR hurt: junc=77 vs 166)
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best from prior experiments
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot (541 junctions vs 162 for BPTT=128)
-ENT_COEF = 0.10   # parallel loop winner: ent=0.10 → 73.5 (vs 0.15 → 54.6, 0.20 → 60.3)
+ENT_COEF = 0.15   # HARD CONSTRAINT: only value that works (0.10→166j, 0.20→0j, 0.15→541j)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -54,7 +53,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 + dual_LR(policy=0.001,value=0.0003) gae=0.95 bptt=64 20min — combining parallel-loop winner (ent=0.10→73.5) with PBT dual-LR insight to prevent value spikes"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 clip_coef=0.1 lr=0.001 bptt=64 25min — conservative PPO clip to fight 30min overtraining; baseline 20min=541j, 30min=61j"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -92,24 +91,11 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = {ent_coef!r}
-        train_args['clip_coef'] = 0.2
+        train_args['clip_coef'] = 0.1  # conservative: halve max policy update to fight overtraining
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
-        # Dual LR: separate (lower) LR for value function to prevent value spikes
-        # PBT-validated: policy_lr=0.0013, value_lr=0.0006 (ratio ~2:1)
-        policy_params = []
-        value_params = []
-        for name, param in self.policy.named_parameters():
-            if any(k in name.lower() for k in ('critic', 'value', 'vf')):
-                value_params.append(param)
-            else:
-                policy_params.append(param)
-        if policy_params and value_params:
-            self.optimizer = type(self.optimizer)([
-                {{'params': policy_params, 'lr': learning_rate}},
-                {{'params': value_params, 'lr': value_lr}},
-            ])
+        # Single LR: dual LR hurt with ent=0.10 (ev=-1.92, junc=77 vs 166).
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
 name, env_cfg, _ = get_mission(mission)
@@ -130,7 +116,7 @@ train_module.train(
     seed=42,
     minibatch_size=minibatch_size,
     log_outputs=True,
-    checkpoint_interval=10,
+    checkpoint_interval=50,  # save less frequently to avoid disk quota issues (was 10)
     vector_num_envs={vector_num_envs!r},
     vector_num_workers={vector_num_workers!r},
 )
