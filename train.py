@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25min: testing if removing penalize_vibe fixes overtraining at 25min
+TIME_BUDGET = 1200  # 20min: testing minibatch=16384 (double) to reduce gradient update frequency
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional"]  # EXPERIMENT: drop penalize_vibe_change, keep role_conditional
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # BEST KNOWN config restored
 NUM_AGENTS = 4
 
 # Policy
@@ -37,21 +37,21 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: remove penalize_vibe_change, keep milestones_2:25 + role_conditional at 25min
-# Hypothesis: penalize_vibe_change accumulates punishment over longer runs — at 25min, agents start avoiding
-# all state transitions to minimize penalty, becoming overly conservative and losing junctions.
-# Removing vibe penalty may allow more flexible exploration and better performance at 25min.
-# Testing if vibe penalty is the culprit for the 20min→25min degradation (552j→390j).
+# NEW EXPERIMENT: ent=0.05 (never tested) with full best reward config at 25min
+# Hypothesis: at 25min, the policy over-explores and diverges from learned junction-holding behavior.
+# Lower entropy (0.05 vs 0.10) constrains this divergence — policy commits to junction-holding faster
+# and maintains it through the longer run. ent=0.10 → 552j at 20min but 390j at 25min; maybe ent=0.05
+# reduces the 20→25min performance gap.
 # All PPO hyperparams kept at best-known values.
 LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
 LR_WARMUP_DURATION = 0   # disabled
 VALUE_LR = 0.001         # same as policy LR
-MINIBATCH_SIZE = 8192
+MINIBATCH_SIZE = 16384  # EXPERIMENT: double minibatch → 1 gradient update per rollout (vs 2 currently)
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF_START = 0.10  # optimal entropy (ent=0.10 → 552j at 20min, confirmed best)
+ENT_COEF_START = 0.10  # back to best ent (ent=0.05 at 25min → 0j FAIL; ent=0.10 is sweet spot)
 ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
@@ -62,7 +62,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_conditional (no penalize_vibe) ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 25min — drop penalize_vibe to reduce long-run overtraining; baseline 20min=552j (ae6f8d2) 25min=390j (4beabbb)"
+DESCRIPTION = f"milestones_2:25 + role_conditional + penalize_vibe ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=16384 20min — double minibatch halves gradient updates per rollout; update_epochs=2 failed (more updates=bad), so fewer updates might help; baseline 20min=552j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
