@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: cosine LR schedule to fight overtraining
+TIME_BUDGET = 1200  # 20min: PBT-validated hyperparams test
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -38,13 +38,13 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64 → 552.6 junctions (ae6f8d2)
 # New experiment: update_epochs=2 at 20min — 2 PPO sweeps per rollout for better sample efficiency
-LEARNING_RATE = 0.001   # best from 20min experiments
-VALUE_LR = 0.001        # same as policy LR (no dual LR - dual LR hurt: junc=77 vs 166)
+LEARNING_RATE = 0.0013  # PBT-validated: cycle 1 winner lr=0.0013 (vs 0.001 baseline)
+VALUE_LR = 0.0013       # same as policy LR (no dual LR - dual LR hurt: junc=77 vs 166)
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best from prior experiments
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF = 0.10   # best 20min: ent=0.10 → 552.6j (vs ent=0.15 → 541j)
+ENT_COEF = 0.159  # PBT-validated: cycle 1 winner ent=0.159 (between 0.15 and 0.20)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -53,7 +53,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 cosine_lr 0.001->0.00005 bptt=64 20min — cosine LR decay to fight overtraining; baseline 20min=552.6j (ae6f8d2)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.159 lr=0.0013 bptt=64 20min — PBT-validated hyperparams (cycle 1 winner); baseline 20min=552.6j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -83,9 +83,6 @@ gamma = {gamma!r}
 bptt_horizon = {bptt_horizon!r}
 gae_lambda = {gae_lambda!r}
 
-import math as _math
-import time as _time
-
 _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
     def __init__(self, train_args, *args, **kwargs):
@@ -98,20 +95,6 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
-        # Cosine LR decay: start at lr0, decay to lr_min over TIME_BUDGET
-        # Goal: train aggressively early, stabilize late to prevent overtraining
-        self._lr0 = learning_rate        # 0.001
-        self._lr_min = 5e-5              # 0.00005
-        self._time_budget = {time_budget!r}
-        self._schedule_start = _time.time()
-    def train(self, *args, **kwargs):
-        # Cosine LR schedule based on elapsed time
-        elapsed = _time.time() - self._schedule_start
-        progress = min(1.0, elapsed / self._time_budget)
-        new_lr = self._lr_min + 0.5 * (self._lr0 - self._lr_min) * (1.0 + _math.cos(_math.pi * progress))
-        for pg in self.optimizer.param_groups:
-            pg['lr'] = new_lr
-        return super().train(*args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
 name, env_cfg, _ = get_mission(mission)
