@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20-min: scale best junction config for longer training
+TIME_BUDGET = 1800  # 30-min: test BPTT=64 (20min sweet spot) at 30min
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -36,11 +36,11 @@ HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
 # Training hyperparameters
-LEARNING_RATE = 0.001  # original LR — best for 20min (bptt=128 hurt 20min runs, try small bptt)
+LEARNING_RATE = 0.001  # original LR — best for 20min
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
-BPTT_HORIZON = 16  # small bptt: 128 consistently hurts 20min runs (162->122 junctions), try default-like 16
+BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot (541 junctions vs 162 for BPTT=128)
 ENT_COEF = 0.15  # higher entropy for junction exploration
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -50,7 +50,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 20min lr=0.001 bptt=16 — small bptt: 128 hurt 20min (162 junctions), test bptt=16 to recover ba53720 perf (541 junctions)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.15 gamma=0.999 gae=0.95 30min lr=0.001 bptt=64 — BPTT=64 is 20min sweet spot (541 junctions), testing if 30min extends gains"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
