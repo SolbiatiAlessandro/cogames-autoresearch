@@ -17,3 +17,6 @@
 - Epochs: ~337
 
 **Note:** This was a fresh-start run (no checkpoint loading). Subsequent runs with checkpoint resumption showed performance degradation (43-57 range).
+
+## Files
+Checkpoint files are packaged in `best_checkpoint_score_73.2.tar.gz` (33 model checkpoints + trainer state).
