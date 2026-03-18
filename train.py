@@ -28,7 +28,7 @@ TIME_BUDGET = 1200  # 20min: optimal duration (20min=552j > 25min=390j)
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # best junction config
+REWARD_VARIANTS = ["milestones_2:25", "penalize_vibe_change"]  # EXPERIMENT: drop role_conditional
 NUM_AGENTS = 4
 
 # Policy
@@ -37,17 +37,18 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: gamma=0.99 at 20min
-# Hypothesis: lower gamma (0.99 vs 0.999) = shorter effective horizon. Agents weight immediate rewards more.
-# Could reduce the long-horizon policy that overtrained between 20→25min.
-# Previous best: gamma=0.999 at 20min → 552.6j. If junction holding is a shorter-horizon goal, 0.99 might work.
-# All other hyperparams kept at best-known values.
+# NEW EXPERIMENT: remove role_conditional from reward variants
+# Hypothesis: role_conditional applies different reward shaping per agent type (miner/aligner/scrambler/scout).
+# This might create conflicting gradients — agents have to learn both their role AND junction holding simultaneously.
+# Removing it simplifies reward signal: all agents get same milestones_2:25 + penalize_vibe. Emergent role division
+# could arise from the game structure itself, without explicit role differentiation in rewards.
+# All PPO hyperparams kept at best-known values.
 LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
 LR_WARMUP_DURATION = 0   # disabled
 VALUE_LR = 0.001         # same as policy LR
 MINIBATCH_SIZE = 8192
-GAMMA = 0.99   # EXPERIMENT: shorter horizon (vs 0.999 best) — could reduce overtraining by shortening credit assignment
+GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
 ENT_COEF_START = 0.10  # optimal entropy (ent=0.10 → 552j at 20min, confirmed best)
@@ -61,7 +62,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.99 lr=0.001 bptt=64 gae=0.95 20min — gamma 0.999→0.99 shorter horizon test; baseline 20min=552j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + penalize_vibe (no role_conditional) ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 20min — drop role_cond to simplify reward signal; baseline 20min=552j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
