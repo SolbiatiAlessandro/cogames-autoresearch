@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25min: testing LR warmup to prevent early instability
+TIME_BUDGET = 1200  # 20min: optimal duration (20min=552j > 25min=390j)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -37,17 +37,17 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: LR warmup at 25min
-# Hypothesis: starting at low LR (0.0001) and ramping to 0.001 over first 5min gives smoother early training,
-# potentially preventing the early policy trajectory that leads to overtraining at 25min.
-# Previous 25min with constant LR=0.001 → 390j (vs 552j at 20min). LR warmup might close this gap.
+# NEW EXPERIMENT: gamma=0.99 at 20min
+# Hypothesis: lower gamma (0.99 vs 0.999) = shorter effective horizon. Agents weight immediate rewards more.
+# Could reduce the long-horizon policy that overtrained between 20→25min.
+# Previous best: gamma=0.999 at 20min → 552.6j. If junction holding is a shorter-horizon goal, 0.99 might work.
 # All other hyperparams kept at best-known values.
-LEARNING_RATE = 0.001    # target LR after warmup
-LR_WARMUP_START = 0.0001 # initial LR (10% of final LR)
-LR_WARMUP_DURATION = 300  # 5min warmup period (seconds)
+LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
+LR_WARMUP_START = 0.001  # no warmup: same as target LR
+LR_WARMUP_DURATION = 0   # disabled
 VALUE_LR = 0.001         # same as policy LR
 MINIBATCH_SIZE = 8192
-GAMMA = 0.999  # longer horizon to value junction holding over time
+GAMMA = 0.99   # EXPERIMENT: shorter horizon (vs 0.999 best) — could reduce overtraining by shortening credit assignment
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
 ENT_COEF_START = 0.10  # optimal entropy (ent=0.10 → 552j at 20min, confirmed best)
@@ -61,7 +61,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr_warmup=0.0001→0.001 bptt=64 gae=0.95 25min — LR warmup over 5min then constant; baseline 25min=390j (4beabbb), 20min=552j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.99 lr=0.001 bptt=64 gae=0.95 20min — gamma 0.999→0.99 shorter horizon test; baseline 20min=552j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -114,15 +114,8 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         super().__init__(train_args, *args, **kwargs)
 
     def train(self):
-        # LR warmup: linearly ramp from lr_warmup_start to learning_rate over lr_warmup_duration seconds
-        if _anneal_start_time[0] is not None:
-            elapsed = _time_module.time() - _anneal_start_time[0]
-            if elapsed < lr_warmup_duration:
-                warmup_frac = elapsed / lr_warmup_duration
-                new_lr = lr_warmup_start + warmup_frac * (learning_rate - lr_warmup_start)
-            else:
-                new_lr = learning_rate
-            self.config["learning_rate"] = new_lr
+        # Constant LR (no warmup — warmup failed: 99.4j vs 390j baseline at 25min)
+        self.config["learning_rate"] = learning_rate
         # Constant entropy (no annealing — all annealing variants fail)
         if _anneal_start_time[0] is not None:
             frac = min(1.0, (_time_module.time() - _anneal_start_time[0]) / anneal_duration)
