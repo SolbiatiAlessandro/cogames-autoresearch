@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25min: testing if stronger reward signal reduces overtraining drop
+TIME_BUDGET = 1500  # 25min: testing LR warmup to prevent early instability
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:50", "role_conditional", "penalize_vibe_change"]  # doubled milestone weight (was :25)
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # best junction config
 NUM_AGENTS = 4
 
 # Policy
@@ -37,13 +37,15 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: milestones_2:50 (doubled weight) at 25min
-# Hypothesis: stronger junction reward signal (2x weight) gives agents clearer incentive to maintain
-# junction holding behavior, potentially reducing the overtraining drop seen at 25min.
-# Previous: milestones_2:25 at 25min → 390j (29% drop from 552j at 20min)
+# NEW EXPERIMENT: LR warmup at 25min
+# Hypothesis: starting at low LR (0.0001) and ramping to 0.001 over first 5min gives smoother early training,
+# potentially preventing the early policy trajectory that leads to overtraining at 25min.
+# Previous 25min with constant LR=0.001 → 390j (vs 552j at 20min). LR warmup might close this gap.
 # All other hyperparams kept at best-known values.
-LEARNING_RATE = 0.001   # best LR from prior sessions (exhaustively tested)
-VALUE_LR = 0.001        # same as policy LR
+LEARNING_RATE = 0.001    # target LR after warmup
+LR_WARMUP_START = 0.0001 # initial LR (10% of final LR)
+LR_WARMUP_DURATION = 300  # 5min warmup period (seconds)
+VALUE_LR = 0.001         # same as policy LR
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
@@ -59,7 +61,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:50 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 gae=0.95 25min — doubled milestone weight (:50 vs :25) to strengthen junction signal and reduce overtraining; baseline 25min=390j (4beabbb), 20min=552j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr_warmup=0.0001→0.001 bptt=64 gae=0.95 25min — LR warmup over 5min then constant; baseline 25min=390j (4beabbb), 20min=552j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -85,6 +87,8 @@ num_steps = {num_steps!r}
 minibatch_size = {minibatch_size!r}
 checkpoints = {checkpoints!r}
 learning_rate = {learning_rate!r}
+lr_warmup_start = {lr_warmup_start!r}
+lr_warmup_duration = {lr_warmup_duration!r}
 value_lr = {value_lr!r}
 gamma = {gamma!r}
 bptt_horizon = {bptt_horizon!r}
@@ -99,7 +103,7 @@ _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
     def __init__(self, train_args, *args, **kwargs):
         _anneal_start_time[0] = _time_module.time()
-        train_args['learning_rate'] = learning_rate
+        train_args['learning_rate'] = lr_warmup_start  # start at warmup LR
         train_args['gamma'] = gamma
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
@@ -110,7 +114,16 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         super().__init__(train_args, *args, **kwargs)
 
     def train(self):
-        # Anneal ent_coef linearly: ent_start → ent_end over anneal_duration seconds
+        # LR warmup: linearly ramp from lr_warmup_start to learning_rate over lr_warmup_duration seconds
+        if _anneal_start_time[0] is not None:
+            elapsed = _time_module.time() - _anneal_start_time[0]
+            if elapsed < lr_warmup_duration:
+                warmup_frac = elapsed / lr_warmup_duration
+                new_lr = lr_warmup_start + warmup_frac * (learning_rate - lr_warmup_start)
+            else:
+                new_lr = learning_rate
+            self.config["learning_rate"] = new_lr
+        # Constant entropy (no annealing — all annealing variants fail)
         if _anneal_start_time[0] is not None:
             frac = min(1.0, (_time_module.time() - _anneal_start_time[0]) / anneal_duration)
             new_ent = ent_start + frac * (ent_end - ent_start)
@@ -155,6 +168,8 @@ def build_train_command():
         minibatch_size=MINIBATCH_SIZE,
         checkpoints="./train_dir",
         learning_rate=LEARNING_RATE,
+        lr_warmup_start=LR_WARMUP_START,
+        lr_warmup_duration=LR_WARMUP_DURATION,
         value_lr=VALUE_LR,
         gamma=GAMMA,
         bptt_horizon=BPTT_HORIZON,
