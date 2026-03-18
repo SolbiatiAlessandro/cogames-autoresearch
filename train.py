@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: optimal duration (20min=552j > 25min=390j)
+TIME_BUDGET = 1500  # 25min: testing if removing penalize_vibe fixes overtraining at 25min
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "penalize_vibe_change"]  # EXPERIMENT: drop role_conditional
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional"]  # EXPERIMENT: drop penalize_vibe_change, keep role_conditional
 NUM_AGENTS = 4
 
 # Policy
@@ -37,11 +37,11 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: remove role_conditional from reward variants
-# Hypothesis: role_conditional applies different reward shaping per agent type (miner/aligner/scrambler/scout).
-# This might create conflicting gradients — agents have to learn both their role AND junction holding simultaneously.
-# Removing it simplifies reward signal: all agents get same milestones_2:25 + penalize_vibe. Emergent role division
-# could arise from the game structure itself, without explicit role differentiation in rewards.
+# NEW EXPERIMENT: remove penalize_vibe_change, keep milestones_2:25 + role_conditional at 25min
+# Hypothesis: penalize_vibe_change accumulates punishment over longer runs — at 25min, agents start avoiding
+# all state transitions to minimize penalty, becoming overly conservative and losing junctions.
+# Removing vibe penalty may allow more flexible exploration and better performance at 25min.
+# Testing if vibe penalty is the culprit for the 20min→25min degradation (552j→390j).
 # All PPO hyperparams kept at best-known values.
 LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
@@ -62,7 +62,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + penalize_vibe (no role_conditional) ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 20min — drop role_cond to simplify reward signal; baseline 20min=552j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:25 + role_conditional (no penalize_vibe) ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 25min — drop penalize_vibe to reduce long-run overtraining; baseline 20min=552j (ae6f8d2) 25min=390j (4beabbb)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
