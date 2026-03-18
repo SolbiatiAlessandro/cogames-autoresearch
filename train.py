@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: PBT-validated hyperparams test
+TIME_BUDGET = 1500  # 25min: testing lower LR to fight overtraining
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -38,13 +38,13 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64 → 552.6 junctions (ae6f8d2)
 # New experiment: update_epochs=2 at 20min — 2 PPO sweeps per rollout for better sample efficiency
-LEARNING_RATE = 0.0013  # PBT-validated: cycle 1 winner lr=0.0013 (vs 0.001 baseline)
-VALUE_LR = 0.0013       # same as policy LR (no dual LR - dual LR hurt: junc=77 vs 166)
+LEARNING_RATE = 0.0005  # half LR hypothesis: smaller steps → less overtraining at 25min
+VALUE_LR = 0.0005       # same as policy LR
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best from prior experiments
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF = 0.159  # PBT-validated: cycle 1 winner ent=0.159 (between 0.15 and 0.20)
+ENT_COEF = 0.10  # best entropy from prior sessions (ent=0.10 → 552.6j at 20min)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -53,7 +53,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.159 lr=0.0013 bptt=64 20min — PBT-validated hyperparams (cycle 1 winner); baseline 20min=552.6j (ae6f8d2)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.0005 bptt=64 25min — half LR to fight overtraining; baseline: 20min=552.6j, 25min=390.0j (4beabbb)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
