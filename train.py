@@ -35,6 +35,9 @@ NUM_AGENTS = 4
 HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
+# Checkpoint resumption — find latest checkpoint to continue training
+RESUME_FROM_CHECKPOINT = True  # Set to False to start fresh
+
 # Training hyperparameters
 LEARNING_RATE = 0.001
 MINIBATCH_SIZE = 8192
@@ -99,10 +102,24 @@ policy_spec = parse_policy_spec(policy_str)
 console = Console()
 device = resolve_training_device(console, device_str)
 
+# Find latest checkpoint if resume mode enabled
+initial_weights = policy_spec.data_path
+if {resume!r}:
+    import glob
+    checkpoints_dir = Path(checkpoints)
+    if checkpoints_dir.exists():
+        checkpoint_dirs = sorted(checkpoints_dir.glob('*'), key=lambda p: p.stat().st_mtime, reverse=True)
+        for ckpt_dir in checkpoint_dirs:
+            model_path = ckpt_dir / 'model.pt'
+            if model_path.exists():
+                initial_weights = str(model_path)
+                print(f"[RESUME] Loading checkpoint from {{initial_weights}}")
+                break
+
 train_module.train(
     env_cfg=env_cfg,
     policy_class_path=policy_spec.class_path,
-    initial_weights_path=policy_spec.data_path,
+    initial_weights_path=initial_weights,
     device=device,
     num_steps=num_steps,
     checkpoints_path=Path(checkpoints),
@@ -130,6 +147,7 @@ def build_train_command():
         gamma=GAMMA,
         bptt_horizon=BPTT_HORIZON,
         gae_lambda=GAE_LAMBDA,
+        resume=RESUME_FROM_CHECKPOINT,
         vector_num_envs=VECTOR_NUM_ENVS,
         vector_num_workers=VECTOR_NUM_WORKERS,
     )
