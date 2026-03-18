@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25min: testing entropy annealing to combat overtraining (20min=552.6j, 25min=390.0j collapse)
+TIME_BUDGET = 1500  # 25min: testing ent_anneal=0.10→0.03 (start from optimal, decay aggressively to combat overtraining)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -37,8 +37,9 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95 → 552.6 junctions (ae6f8d2)
-# New experiment: entropy annealing ent=0.15→0.05 over 25min to combat overtraining
-# Hypothesis: high entropy early = good exploration, low entropy late = stable junction-holding
+# New experiment: entropy annealing ent=0.10→0.03 over 25min to combat overtraining
+# Hypothesis: start at OPTIMAL entropy (0.10), decay more aggressively to 0.03 for stable exploitation
+# Prior anneal 0.15→0.05 at 25min = 352.8j (WORSE than 0.15→0.05). This time starting from the sweet spot.
 # Overtraining pattern: 20min=552j > 25min=390j > 30min=61j — policy deteriorates with longer training
 LEARNING_RATE = 0.001   # best LR from prior sessions (exhaustively tested)
 VALUE_LR = 0.001        # same as policy LR
@@ -46,8 +47,8 @@ MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF_START = 0.15  # initial entropy — high exploration early (ent=0.15 → 541j at 20min)
-ENT_COEF_END = 0.05    # final entropy — low for stable exploitation late (well below tested ent=0.10)
+ENT_COEF_START = 0.10  # initial entropy — optimal exploration (ent=0.10 → 552j at 20min, confirmed best)
+ENT_COEF_END = 0.03    # final entropy — aggressive decay for stable exploitation late
 ENT_COEF = ENT_COEF_START  # placeholder for logging; actual annealing happens in train()
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
@@ -57,7 +58,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent_anneal={ENT_COEF_START}→{ENT_COEF_END} lr=0.001 bptt=64 gae=0.95 25min — entropy annealing to combat overtraining; baseline 20min=552.6j 25min=390.0j (ae6f8d2/4beabbb)"
+DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe ent_anneal={ENT_COEF_START}→{ENT_COEF_END} lr=0.001 bptt=64 gae=0.95 25min — start from optimal ent=0.10, aggressive decay to 0.03; prev 0.15→0.05=352.8j (a0c2824)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
