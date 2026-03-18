@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: best known training duration (sweet spot)
+TIME_BUDGET = 1500  # 25min: testing if stronger reward signal reduces overtraining drop
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # best junction config from prior sessions
+REWARD_VARIANTS = ["milestones_2:50", "role_conditional", "penalize_vibe_change"]  # doubled milestone weight (was :25)
 NUM_AGENTS = 4
 
 # Policy
@@ -37,14 +37,14 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, 
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: MINIBATCH_SIZE=4096 (half of 8192) at 20min
-# Hypothesis: smaller minibatch → more gradient updates per epoch → more learning signal per second.
-# With 64 envs and bptt=64, rollout = 64*64=4096 steps. minibatch=4096 means 1 full-rollout minibatch.
-# Smaller batches could help escape local optima and improve sample efficiency.
+# NEW EXPERIMENT: milestones_2:50 (doubled weight) at 25min
+# Hypothesis: stronger junction reward signal (2x weight) gives agents clearer incentive to maintain
+# junction holding behavior, potentially reducing the overtraining drop seen at 25min.
+# Previous: milestones_2:25 at 25min → 390j (29% drop from 552j at 20min)
 # All other hyperparams kept at best-known values.
 LEARNING_RATE = 0.001   # best LR from prior sessions (exhaustively tested)
 VALUE_LR = 0.001        # same as policy LR
-MINIBATCH_SIZE = 4096
+MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
@@ -59,7 +59,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_cond + penalize_vibe minibatch=4096 ent=0.10 lr=0.001 bptt=64 gae=0.95 20min — half minibatch vs baseline (4096 vs 8192); more gradient updates per epoch; baseline 20min=552.6j (ae6f8d2)"
+DESCRIPTION = f"milestones_2:50 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 gae=0.95 25min — doubled milestone weight (:50 vs :25) to strengthen junction signal and reduce overtraining; baseline 25min=390j (4beabbb), 20min=552j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
