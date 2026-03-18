@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20-min: test ent_coef=0.10 (lower than 0.15 baseline) to tighten focus on junction holding
+TIME_BUDGET = 1200  # 20-min: apply PBT-validated hyperparams
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -35,13 +35,15 @@ NUM_AGENTS = 4
 HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
 
-# Training hyperparameters
-LEARNING_RATE = 0.001  # original LR — best for 20min
+# Training hyperparameters — PBT-validated: cycle 1 winner (Agent 1) had these hyperparams
+# PBT run found: policy_lr=0.0013, value_lr=0.0006, ent=0.159, gae=0.95 → best performance
+LEARNING_RATE = 0.0013  # PBT-selected: lower than default (0.001→0.0013 via selection)
+VALUE_LR = 0.0006       # PBT-selected: separate value LR (dual LR setup)
 MINIBATCH_SIZE = 8192
 GAMMA = 0.999  # longer horizon to value junction holding over time
-GAE_LAMBDA = 0.95  # longer advantage window to match gamma=0.999 for junction holding
+GAE_LAMBDA = 0.95  # PBT-selected: gae=0.95 beat gae=0.98 in cycle 1 winner
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot (541 junctions vs 162 for BPTT=128)
-ENT_COEF = 0.10  # lower entropy (0.10 vs 0.15 baseline) — test if tighter exploration focus improves junction holding
+ENT_COEF = 0.159  # PBT-selected: 0.159 from cycle 1 winning agent (Agent 1)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -50,7 +52,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 gamma=0.999 gae=0.95 20min lr=0.001 bptt=64 — lower entropy (0.10 vs 0.15 baseline) to tighten junction focus, testing against ba53720 (541 junctions)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe PBT-validated hyperparams: lr=0.0013 value_lr=0.0006 ent=0.159 gae=0.95 bptt=64 20min — applying cycle1 winner hyperparams from PBT run (A1: best score 17.9, 134 junctions in 5min)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -75,6 +77,7 @@ num_steps = {num_steps!r}
 minibatch_size = {minibatch_size!r}
 checkpoints = {checkpoints!r}
 learning_rate = {learning_rate!r}
+value_lr = {value_lr!r}
 gamma = {gamma!r}
 bptt_horizon = {bptt_horizon!r}
 gae_lambda = {gae_lambda!r}
@@ -91,6 +94,20 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
+        # Dual LR: separate (lower) LR for value function to prevent value spikes
+        # PBT-validated: policy_lr=0.0013, value_lr=0.0006 (ratio ~2:1)
+        policy_params = []
+        value_params = []
+        for name, param in self.policy.named_parameters():
+            if any(k in name.lower() for k in ('critic', 'value', 'vf')):
+                value_params.append(param)
+            else:
+                policy_params.append(param)
+        if policy_params and value_params:
+            self.optimizer = type(self.optimizer)([
+                {{'params': policy_params, 'lr': learning_rate}},
+                {{'params': value_params, 'lr': value_lr}},
+            ])
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
 name, env_cfg, _ = get_mission(mission)
@@ -129,6 +146,7 @@ def build_train_command():
         minibatch_size=MINIBATCH_SIZE,
         checkpoints="./train_dir",
         learning_rate=LEARNING_RATE,
+        value_lr=VALUE_LR,
         gamma=GAMMA,
         bptt_horizon=BPTT_HORIZON,
         gae_lambda=GAE_LAMBDA,
