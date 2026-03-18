@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: test clip_coef=0.3 at 20min (best 20min: 552.6j, ae6f8d2)
+TIME_BUDGET = 1200  # 20min: cosine LR schedule to fight overtraining
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -53,7 +53,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 lr=0.001 bptt=64 clip=0.3 20min — more aggressive PPO clip (0.2->0.3) for faster consolidation; baseline 20min=552.6j (ae6f8d2)"
+DESCRIPTION = "milestones_2:25 + role_cond + penalize_vibe ent=0.10 cosine_lr 0.001->0.00005 bptt=64 20min — cosine LR decay to fight overtraining; baseline 20min=552.6j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -83,6 +83,9 @@ gamma = {gamma!r}
 bptt_horizon = {bptt_horizon!r}
 gae_lambda = {gae_lambda!r}
 
+import math as _math
+import time as _time
+
 _OrigPuffeRL = pufferl_module.PuffeRL
 class _PatchedPuffeRL(_OrigPuffeRL):
     def __init__(self, train_args, *args, **kwargs):
@@ -91,11 +94,24 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['bptt_horizon'] = bptt_horizon
         train_args['gae_lambda'] = gae_lambda
         train_args['ent_coef'] = {ent_coef!r}
-        train_args['clip_coef'] = 0.3  # more aggressive clip: larger policy updates, faster consolidation
+        train_args['clip_coef'] = 0.2  # best clip_coef from prior sessions
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         super().__init__(train_args, *args, **kwargs)
-        # Single LR: dual LR hurt with ent=0.10 (ev=-1.92, junc=77 vs 166).
+        # Cosine LR decay: start at lr0, decay to lr_min over TIME_BUDGET
+        # Goal: train aggressively early, stabilize late to prevent overtraining
+        self._lr0 = learning_rate        # 0.001
+        self._lr_min = 5e-5              # 0.00005
+        self._time_budget = {time_budget!r}
+        self._schedule_start = _time.time()
+    def train(self, *args, **kwargs):
+        # Cosine LR schedule based on elapsed time
+        elapsed = _time.time() - self._schedule_start
+        progress = min(1.0, elapsed / self._time_budget)
+        new_lr = self._lr_min + 0.5 * (self._lr0 - self._lr_min) * (1.0 + _math.cos(_math.pi * progress))
+        for pg in self.optimizer.param_groups:
+            pg['lr'] = new_lr
+        return super().train(*args, **kwargs)
 pufferl_module.PuffeRL = _PatchedPuffeRL
 
 name, env_cfg, _ = get_mission(mission)
@@ -141,6 +157,7 @@ def build_train_command():
         ent_coef=ENT_COEF,
         vector_num_envs=VECTOR_NUM_ENVS,
         vector_num_workers=VECTOR_NUM_WORKERS,
+        time_budget=TIME_BUDGET,
     )
     return ["uv", "run", "python", "-c", script]
 
