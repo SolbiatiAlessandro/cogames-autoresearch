@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: ent=0.07 experiment
+TIME_BUDGET = 1200  # 20min: vector_batch_size=256 rollout experiment
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -32,11 +32,13 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-# EXPERIMENT: LSTM (best known architecture) with ent=0.07 — testing lower entropy
-# Trend from prior sessions: ent=0.10 → 552j > ent=0.15 → 541j (lower is slightly better).
-# Hypothesis: continuing this trend, ent=0.07 might further improve junction holding via more focused exploitation.
-# ent=0.20 failed completely (0j), all annealing variants failed. Constant low entropy is the pattern.
-# Risk: too-low entropy may cause premature convergence / insufficient exploration to find junctions.
+# EXPERIMENT: LSTM with vector_batch_size=256 (double the default rollout length)
+# All PPO hyperparams exhausted. Next untested: rollout length (vector_batch_size).
+# Default vector_batch_size=128 → 128*64=8192 transitions per update (1 BPTT segment pair per seq).
+# With vector_batch_size=256 → 256*64=16384 transitions per update (4 BPTT segments of 64 per seq).
+# Hypothesis: longer rollout sequences let the LSTM see more temporal context per gradient update,
+# enabling better long-term credit assignment for junction holding strategies.
+# With minibatch_size=8192: 16384 total / 8192 = 2 gradient steps per rollout (fresh data each).
 HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM: best architecture (stateless=337j, 39% worse)
 
@@ -51,9 +53,10 @@ MINIBATCH_SIZE = 8192  # best known minibatch (16384 failed 27j, 4096 failed 54j
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF_START = 0.07  # EXPERIMENT: lower entropy (0.10→552j, 0.15→541j, lower=better trend)
-ENT_COEF_END = 0.07    # constant entropy (no annealing — all annealing variants fail)
+ENT_COEF_START = 0.10  # best known entropy (0.10→552j > 0.15→541j; 0.07→0j FAIL; 0.20→0j FAIL)
+ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
+VECTOR_BATCH_SIZE = 256  # EXPERIMENT: doubled rollout (default=128); 256*64=16384 transitions/update
 LR_DROP_TIME = 9999    # disabled (step LR failed: 190j; constant LR best)
 LR_FINAL = 0.001       # same as base (no step LR)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
@@ -64,7 +67,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"LSTM ent=0.07 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 20min — lower entropy test; trend: ent=0.10→552j > ent=0.15→541j, testing if ent=0.07 continues improvement; hypothesis: less entropy = more focused exploitation = better junction holding at 20min"
+DESCRIPTION = f"LSTM ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 vector_batch_size=256 20min — doubled rollout length (default=128); 256*64=16384 transitions/update; 2 gradient steps per rollout; hypothesis: LSTM sees 4 BPTT segments per seq (vs 2 with default=128), enabling better long-term temporal credit assignment for junction holding"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -152,6 +155,7 @@ train_module.train(
     log_outputs=True,
     checkpoint_interval=50,  # save less frequently to avoid disk quota issues (was 10)
     vector_num_envs={vector_num_envs!r},
+    vector_batch_size={vector_batch_size!r},
     vector_num_workers={vector_num_workers!r},
 )
 """
@@ -177,6 +181,7 @@ def build_train_command():
         ent_start=ENT_COEF_START,
         ent_end=ENT_COEF_END,
         vector_num_envs=VECTOR_NUM_ENVS,
+        vector_batch_size=VECTOR_BATCH_SIZE,
         vector_num_workers=VECTOR_NUM_WORKERS,
         time_budget=TIME_BUDGET,
         lr_drop_time=LR_DROP_TIME,
