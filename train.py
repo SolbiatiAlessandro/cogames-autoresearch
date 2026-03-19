@@ -21,28 +21,28 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25min: adam_beta1=0.9 experiment
+TIME_BUDGET = 1200  # 20min: stateless policy experiment
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # BEST KNOWN config restored
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # BEST KNOWN config
 NUM_AGENTS = 4
 
 # Policy
-HIDDEN_SIZE = 256  # back to best-known hidden size
-POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # options: lstm, baseline, stateless; use kw.hidden_size=N to change size
+# NEW EXPERIMENT: stateless (MLP) policy instead of LSTM
+# Hypothesis: LSTM accumulates recurrent state over training, which may destabilize gradients at 25min+.
+# A stateless policy has no such accumulation — each step is processed independently.
+# This could be more robust at longer timescales even if slightly weaker on temporal credit assignment.
+# All other hyperparams kept at best-known 20min values. Comparing directly vs 552.6j LSTM baseline.
+HIDDEN_SIZE = 256  # keep same capacity
+POLICY = f"class=stateless,kw.hidden_size={HIDDEN_SIZE}"  # stateless = MLP, no recurrence
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# NEW EXPERIMENT: ent=0.05 (never tested) with full best reward config at 25min
-# Hypothesis: at 25min, the policy over-explores and diverges from learned junction-holding behavior.
-# Lower entropy (0.05 vs 0.10) constrains this divergence — policy commits to junction-holding faster
-# and maintains it through the longer run. ent=0.10 → 552j at 20min but 390j at 25min; maybe ent=0.05
-# reduces the 20→25min performance gap.
-# All PPO hyperparams kept at best-known values.
+# This experiment: same config but stateless policy — does removing LSTM recurrence help or hurt?
 LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
 LR_WARMUP_DURATION = 0   # disabled
@@ -64,7 +64,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_conditional + penalize_vibe ent=0.10 gamma=0.999 lr=0.001 adam_beta1=0.9 bptt=64 gae=0.95 minibatch=8192 25min — adam_beta1=0.9 (cogames default is 0.95, non-standard); high momentum may cause optimizer to overshoot at longer runs; standard beta1=0.9 should reduce accumulated gradient drift and delay overtraining past 20min; max_grad_norm restored to 1.5"
+DESCRIPTION = f"stateless MLP policy (no LSTM) ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 20min — hypothesis: LSTM recurrent state accumulation causes gradient instability at 25min+; stateless policy has no such accumulation and may be more stable; comparing against 552.6j LSTM baseline at 20min"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -117,7 +117,7 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
         train_args['max_grad_norm'] = 1.5  # back to cogames default (0.5 tested → 136j, worse)
-        train_args['adam_beta1'] = 0.9   # standard Adam (cogames default is 0.95 — non-standard)
+        train_args['adam_beta1'] = 0.95  # restore cogames default (0.9 tested → 240.8j, worse)
         super().__init__(train_args, *args, **kwargs)
 
     def train(self):
