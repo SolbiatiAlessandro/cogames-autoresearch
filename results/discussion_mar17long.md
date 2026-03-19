@@ -272,3 +272,20 @@
   The BPTT contexts are incompatible — policies trained under BPTT=128 don't benefit from BPTT=64 continuation.
 - OVERALL STATUS: All PPO hyperparams, all architectures, all BPTT combinations, all warm-start strategies exhausted.
   Best results: 1029.8j at 10min (BPTT=128) and 552.6j at 20min (BPTT=64). These are the ceiling for PPO baseline.
+
+**Exp: cogsguard_arena.basic LSTM ent=0.10 bptt=64 20min (804fc20) — DISCARD**
+- score=3.4, junctions=83.4, aligned=0.0, clips_junctions_held=0.0
+- Tried compact 50x50 arena map (vs 88x88 machina) with 8 agents (vs 4). Same best-known hyperparams.
+- Result: 83.4j vs 552.6j machina baseline — 85% drop! FAILS badly.
+- Interesting finding: clips_junctions_held=0 (vs ~1.2M in machina) — arena has no clips? Different dynamic entirely.
+- The machina hyperparameters do NOT transfer to arena map. Different geometry needs re-tuning.
+- ARENA CONCLUSION: cogsguard_arena.basic is a fundamentally different environment; machina configs don't transfer.
+- DIRECTION: Return to machina; explore novel reward engineering or multi-agent mechanisms.
+
+**Exp: milestones_2:50 + role_conditional + penalize_vibe + ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + machina 20min (new) — DISCARD**
+- score=62.7, junctions=46.2, aligned=0.0, clips_junctions_held=1,196,418
+- milestones_2:50 at 20min → SEVERE FAILURE: 46.2j vs 552.6j baseline (92% drop!); clips dominate completely
+- Confirms prior finding: milestones_2:50 already tested at 25min (10.4j, commit f530e5b). Both durations fail badly.
+- Higher milestone weight doesn't incentivize junctions more — it may destabilize the reward landscape
+- MILESTONES CONCLUSION: milestone weight :25 is optimal. Both :50 (this) and lower weights untested but :25 confirmed best.
+- REMAINING IDEAS: milestones_2 with other weights (:10, :15), multi-agent coordination (MAPPO), different reward combos

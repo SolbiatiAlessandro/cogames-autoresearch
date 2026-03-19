@@ -20,7 +20,7 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
-MISSION = "cogsguard_arena.basic"  # NEW: compact 50x50 arena map, 8 agents — denser = faster junction contact
+MISSION = "cogsguard_machina_1.basic"  # best known map (arena failed: 83.4j vs machina 552.6j)
 TIME_BUDGET = 1200  # 20min — same budget as best config (ae6f8d2)
 
 # ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ TIME_BUDGET = 1200  # 20min — same budget as best config (ae6f8d2)
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # BEST KNOWN config
+REWARD_VARIANTS = ["milestones_2:50", "role_conditional", "penalize_vibe_change"]  # NEW: higher milestone weight (only :25 tested at 20min → 552.6j)
 NUM_AGENTS = 4
 
 # Policy
@@ -37,7 +37,7 @@ POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM — best architectur
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# This experiment: ent=0.07 (never tested), everything else at best-known values
+# This experiment: milestones_2:50 (higher milestone weight, :25 was best at 552.6j, testing if :50 helps)
 LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
 LR_WARMUP_DURATION = 0   # disabled
@@ -60,7 +60,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "cogsguard_arena.basic LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 20min — NEW: compact 50x50 arena map (vs 88x88 machina) with 8 agents (vs 4); denser agent-to-map ratio means faster junction contact; all other hyperparams at best-known values; hypothesis: more junction interactions per time unit → more junctions at 20min; baseline: machina 552.6j (ae6f8d2)"
+DESCRIPTION = "milestones_2:50 + role_conditional + penalize_vibe_change LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 machina 20min — NEW: milestone weight 50 (double the :25 that gave 552.6j at ae6f8d2); only :25 tested at 20min, higher weight may push agents harder toward junction control; all other hyperparams at best-known values"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
