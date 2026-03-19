@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1500  # 25min: step LR experiment
+TIME_BUDGET = 1500  # 25min: max_grad_norm experiment
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -54,8 +54,8 @@ BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
 ENT_COEF_START = 0.10  # best ent
 ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
-LR_DROP_TIME = 1200    # after 20min, drop LR from 0.001 to 0.0001 (step LR)
-LR_FINAL = 0.0001      # LR for final 5min (10x reduction; keeps policy near 20min optimum)
+LR_DROP_TIME = 9999    # disabled (step LR failed: 190j; constant LR best)
+LR_FINAL = 0.001       # same as base (no step LR)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
 
 # Hardware
@@ -64,7 +64,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"milestones_2:25 + role_conditional + penalize_vibe ent=0.10 gamma=0.999 lr=0.001→0.0001 step@20min bptt=64 gae=0.95 minibatch=8192 25min — step LR: full 0.001 for 20min, drop 10x to 0.0001 for final 5min; cosine over 20min failed (394j); const 0.001 at 25min=390j; hypothesis: keep full LR for learning phase, tiny LR to consolidate without overtraining"
+DESCRIPTION = f"milestones_2:25 + role_conditional + penalize_vibe ent=0.10 gamma=0.999 lr=0.001 max_grad_norm=0.5 bptt=64 gae=0.95 minibatch=8192 25min — max_grad_norm=0.5 (from 1.5 default); standard PPO uses 0.5; hypothesis: current 1.5 allows too-large gradient steps causing policy divergence after 20min; stricter clipping should slow overtraining"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -116,18 +116,12 @@ class _PatchedPuffeRL(_OrigPuffeRL):
         train_args['clip_coef'] = 0.2  # best clip_coef from prior sessions
         train_args['vf_coef'] = 0.5
         train_args['update_epochs'] = 1
+        train_args['max_grad_norm'] = 0.5  # standard PPO (default in cogames is 1.5)
         super().__init__(train_args, *args, **kwargs)
 
     def train(self):
-        # Step LR: full LR for first 20min, then drop 10x for consolidation phase
-        if _anneal_start_time[0] is not None:
-            elapsed = _time_module.time() - _anneal_start_time[0]
-            if elapsed < lr_drop_time:
-                self.config["learning_rate"] = learning_rate  # 0.001 for first 20min
-            else:
-                self.config["learning_rate"] = lr_final  # 0.0001 for final 5min
-        else:
-            self.config["learning_rate"] = learning_rate
+        # Constant LR (step LR and cosine LR both failed)
+        self.config["learning_rate"] = learning_rate
         # Constant entropy (no annealing — all annealing variants fail)
         if _anneal_start_time[0] is not None:
             frac = min(1.0, (_time_module.time() - _anneal_start_time[0]) / anneal_duration)
