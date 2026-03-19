@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: puffer policy class experiment
+TIME_BUDGET = 600  # 10min: BPTT=64 at 10min (NEVER TESTED!) — best 10min was BPTT=128+ent=0.15→1029.8j
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -32,13 +32,13 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-# EXPERIMENT: class=puffer (PufferDefaultPolicy) at 20min
-# All PPO hyperparams and LSTM/stateless architectures exhausted.
-# PufferDefaultPolicy is PufferLib 4.0-style: GELU encoder + LSTMWrapper, std=0.01 action head.
-# Different from class=lstm (mettagrid LSTMPolicy) — different encoder/decoder architecture.
-# Never tested in any prior session. Comparing against best: LSTM ent=0.10 → 552.6j at 20min (ae6f8d2).
+# EXPERIMENT: BPTT=64 at 10min — never tested!
+# Best 10min: BPTT=128 + ent=0.15 → 1029.8j (commit 96b72bf)
+# Best 20min: BPTT=64 + ent=0.10 → 552.6j (commit ae6f8d2)
+# BPTT=64 is dramatically better at 20min (552j vs 162j with BPTT=128)
+# Hypothesis: BPTT=64 may also improve or match BPTT=128 at 10min (10min sweet spot for LSTM?)
 HIDDEN_SIZE = 256
-POLICY = f"class=puffer,kw.hidden_size={HIDDEN_SIZE}"  # PufferLib 4.0 LSTM: GELU+LSTMWrapper, UNTESTED
+POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM — best architecture (552.6j at 20min)
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
@@ -65,7 +65,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "puffer policy class ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 20min — PufferLib 4.0 LSTM architecture (GELU encoder + LSTMWrapper + std=0.01 action head); UNTESTED; all LSTM/stateless tested (LSTM=552j best, stateless=338j); hypothesis: different LSTM architecture may show different learning dynamics"
+DESCRIPTION = "LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 10min — BPTT=64 at 10min NEVER TESTED; best 10min was BPTT=128+ent=0.15→1029.8j; BPTT=64 massively improved 20min (162j→552j); testing if same benefit at 10min; using ent=0.10 (best 20min entropy)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
