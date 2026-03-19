@@ -20,8 +20,8 @@ import time
 from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
-MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min total: Phase1=10min (BPTT=128) + Phase2=10min (BPTT=64 from checkpoint)
+MISSION = "cogsguard_arena.basic"  # NEW: compact 50x50 arena map, 8 agents — denser = faster junction contact
+TIME_BUDGET = 1200  # 20min — same budget as best config (ae6f8d2)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -32,20 +32,8 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-# EXPERIMENT: Two-phase training — exploit BPTT time-dependence
-# NEW FINDING (38b180d): BPTT=128 → 1029j at 10min BUT 162j at 20min (overtrains)
-#                        BPTT=64  →  87j at 10min BUT 552j at 20min (stable)
-# Hypothesis: BPTT=128 learns fast early, BPTT=64 avoids overtraining later.
-# Two-phase: Phase1 (BPTT=128, 10min) builds strong junction policy → Phase2 (BPTT=64, 10min from ckpt)
-# Phase2 loads Phase1 checkpoint → continues learning stably without BPTT=128 overtraining
 HIDDEN_SIZE = 256
 POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM — best architecture
-
-# Two-phase training budgets
-PHASE1_BUDGET = 600   # Phase 1: BPTT=128, 10min — fast early junction learning
-PHASE2_BUDGET = 600   # Phase 2: BPTT=64, 10min from Phase1 ckpt — stable continued learning
-PHASE1_BPTT = 128
-PHASE2_BPTT = 64
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
@@ -57,7 +45,7 @@ VALUE_LR = 0.001         # same as policy LR
 MINIBATCH_SIZE = 8192  # best known minibatch (16384 failed 27j, 4096 failed 54j)
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
-BPTT_HORIZON = PHASE1_BPTT  # Phase 1 starts with BPTT=128 (best 10min); Phase 2 uses BPTT=64
+BPTT_HORIZON = 64  # best known for 20min (128 overtrained)
 ENT_COEF_START = 0.10  # best known entropy (0.10→552j > 0.15→541j; 0.07→0j FAIL; 0.20→0j FAIL)
 ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
@@ -72,7 +60,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "LSTM ent=0.10 two-phase BPTT=128→64 gae=0.95 lr=0.001 minibatch=8192 20min — two-phase training: Phase1=BPTT128/10min(builds junctions), Phase2=BPTT64/10min-from-ckpt(avoids overtraining); exploits finding: BPTT=128 fast early(1029j@10m) but overtrain(162j@20m), BPTT=64 stable(552j@20m); best of both?"
+DESCRIPTION = "cogsguard_arena.basic LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 20min — NEW: compact 50x50 arena map (vs 88x88 machina) with 8 agents (vs 4); denser agent-to-map ratio means faster junction contact; all other hyperparams at best-known values; hypothesis: more junction interactions per time unit → more junctions at 20min; baseline: machina 552.6j (ae6f8d2)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -371,49 +359,21 @@ def main():
     experiment_start_time = time.time()
 
     print("=" * 60)
-    print("CoGames Autoresearch Training — TWO-PHASE")
+    print("CoGames Autoresearch Training")
     print("=" * 60)
     print(f"Mission:          {MISSION}")
     print(f"Policy:           {POLICY}")
     print(f"Reward variants:  {REWARD_VARIANTS}")
     print(f"Learning rate:    {LEARNING_RATE}")
     print(f"Minibatch size:   {MINIBATCH_SIZE}")
-    print(f"Phase 1:          BPTT={PHASE1_BPTT}, {PHASE1_BUDGET}s")
-    print(f"Phase 2:          BPTT={PHASE2_BPTT}, {PHASE2_BUDGET}s (from Phase1 checkpoint)")
+    print(f"BPTT:             {BPTT_HORIZON}")
+    print(f"Time budget:      {TIME_BUDGET}s")
     print(f"Device:           {DEVICE}")
     print("=" * 60)
 
-    # -----------------------------------------------------------------------
-    # Phase 1: BPTT=128, 10min — fast early junction learning
-    # -----------------------------------------------------------------------
-    print(f"\n{'='*60}")
-    print(f"PHASE 1: BPTT={PHASE1_BPTT}, budget={PHASE1_BUDGET}s")
-    print(f"{'='*60}\n")
-    cmd_p1 = build_train_command(bptt_override=PHASE1_BPTT, time_budget_override=PHASE1_BUDGET)
-    output_lines_p1, returncode_p1 = run_training_phase(cmd_p1, PHASE1_BUDGET, "PHASE1")
-    phase1_seconds = time.time() - experiment_start_time
-
-    # Find Phase 1 checkpoint
-    checkpoint_p1 = find_latest_checkpoint()
-    print(f"\n[Phase 1 done in {phase1_seconds:.0f}s] Checkpoint: {checkpoint_p1}")
-
-    # -----------------------------------------------------------------------
-    # Phase 2: BPTT=64, 10min — stable continued learning from Phase1 ckpt
-    # -----------------------------------------------------------------------
-    print(f"\n{'='*60}")
-    print(f"PHASE 2: BPTT={PHASE2_BPTT}, budget={PHASE2_BUDGET}s, loading from Phase1 ckpt")
-    print(f"{'='*60}\n")
-    cmd_p2 = build_train_command(
-        bptt_override=PHASE2_BPTT,
-        initial_weights_path=checkpoint_p1,
-        time_budget_override=PHASE2_BUDGET,
-    )
-    output_lines_p2, returncode_p2 = run_training_phase(cmd_p2, PHASE2_BUDGET, "PHASE2")
+    cmd = build_train_command()
+    output_lines, returncode = run_training_phase(cmd, TIME_BUDGET, "MAIN")
     training_seconds = time.time() - experiment_start_time
-
-    # Use Phase 2 output for final metrics (that's what we care about)
-    output_lines = output_lines_p2
-    returncode = returncode_p2
 
     # ---------------------------------------------------------------------------
     # Extract metrics from training output
