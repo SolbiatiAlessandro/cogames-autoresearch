@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: vector_batch_size=256 rollout experiment
+TIME_BUDGET = 1200  # 20min: puffer policy class experiment
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -32,15 +32,13 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-# EXPERIMENT: LSTM with vector_batch_size=256 (double the default rollout length)
-# All PPO hyperparams exhausted. Next untested: rollout length (vector_batch_size).
-# Default vector_batch_size=128 → 128*64=8192 transitions per update (1 BPTT segment pair per seq).
-# With vector_batch_size=256 → 256*64=16384 transitions per update (4 BPTT segments of 64 per seq).
-# Hypothesis: longer rollout sequences let the LSTM see more temporal context per gradient update,
-# enabling better long-term credit assignment for junction holding strategies.
-# With minibatch_size=8192: 16384 total / 8192 = 2 gradient steps per rollout (fresh data each).
+# EXPERIMENT: class=puffer (PufferDefaultPolicy) at 20min
+# All PPO hyperparams and LSTM/stateless architectures exhausted.
+# PufferDefaultPolicy is PufferLib 4.0-style: GELU encoder + LSTMWrapper, std=0.01 action head.
+# Different from class=lstm (mettagrid LSTMPolicy) — different encoder/decoder architecture.
+# Never tested in any prior session. Comparing against best: LSTM ent=0.10 → 552.6j at 20min (ae6f8d2).
 HIDDEN_SIZE = 256
-POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM: best architecture (stateless=337j, 39% worse)
+POLICY = f"class=puffer,kw.hidden_size={HIDDEN_SIZE}"  # PufferLib 4.0 LSTM: GELU+LSTMWrapper, UNTESTED
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
@@ -56,7 +54,7 @@ BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
 ENT_COEF_START = 0.10  # best known entropy (0.10→552j > 0.15→541j; 0.07→0j FAIL; 0.20→0j FAIL)
 ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
-VECTOR_BATCH_SIZE = 256  # EXPERIMENT: doubled rollout (default=128); 256*64=16384 transitions/update
+VECTOR_BATCH_SIZE = 128  # default rollout (256 tested → 99.4j, 82% drop!)
 LR_DROP_TIME = 9999    # disabled (step LR failed: 190j; constant LR best)
 LR_FINAL = 0.001       # same as base (no step LR)
 NUM_STEPS = 10_000_000_000  # effectively infinite — TIME_BUDGET is the real limit
@@ -67,7 +65,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"LSTM ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 vector_batch_size=256 20min — doubled rollout length (default=128); 256*64=16384 transitions/update; 2 gradient steps per rollout; hypothesis: LSTM sees 4 BPTT segments per seq (vs 2 with default=128), enabling better long-term temporal credit assignment for junction holding"
+DESCRIPTION = "puffer policy class ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 20min — PufferLib 4.0 LSTM architecture (GELU encoder + LSTMWrapper + std=0.01 action head); UNTESTED; all LSTM/stateless tested (LSTM=552j best, stateless=338j); hypothesis: different LSTM architecture may show different learning dynamics"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
