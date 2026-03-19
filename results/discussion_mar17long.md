@@ -177,3 +177,98 @@
 - Smaller minibatch = fewer steps per gradient update = worse learning for junction-holding
 - MINIBATCH CONCLUSION: minibatch=8192 is optimal. Smaller batches (4096) drastically hurt at 20min.
 - REMAINING LEVERS: Reward variant weight tuning (milestones_2:50 vs :25), different reward combos, rollout_length changes
+
+**Exp: milestones_2:50 + ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + 25min (f530e5b) — DISCARD**
+- score=67.7, junctions=10.4, aligned=0.0, clips_junctions_held=1,189,600
+- Doubled milestone weight (:50 vs :25) at 25min → CATASTROPHIC: 10.4j vs 390j baseline at 25min
+- Milestone weight doubling destroyed junction learning completely
+- MILESTONES:50 CONCLUSION: Higher milestone weight does NOT help with overtraining. :25 remains optimal.
+- REMAINING LEVERS: LR warmup, gamma sweep (0.99?), BPTT=32 at 20min, reward variant removal
+
+**Exp: lr_warmup=0.0001→0.001 over 5min + ent=0.10 + bptt=64 + gae=0.95 + 25min (167ca19) — DISCARD**
+- score=37.5, junctions=99.4, aligned=0.0, clips_junctions_held=1,195,507
+- LR warmup (start 0.0001, ramp to 0.001 over 5min) → WORSE: 99.4j vs 390j baseline at 25min (75% drop!)
+- Starting at low LR delays useful learning — junction signal is weak early so low LR amplifies this problem
+- LR WARMUP CONCLUSION: Warmup makes overtraining worse, not better. Full LR=0.001 from start is essential.
+- REMAINING UNEXPLORED: gamma=0.99 at 20min (shorter horizon, could reduce overtraining)
+
+**Exp: gamma=0.99 + ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + 20min (f5fb0c6) — DISCARD**
+- score=75.2, junctions=124.1, aligned=0.1, clips_junctions_held=1,199,653
+- Lower gamma (0.99 vs 0.999) → SEVERE DECLINE: 124.1j vs 552.6j baseline (78% drop!)
+- Shorter discount horizon: agents over-discount future rewards → junction holding (sustained effort) is devalued
+- Clips dominate: gamma=0.99 makes the long-horizon junction-holding objective much harder to learn
+- GAMMA CONCLUSION: gamma=0.999 is optimal. Junction holding requires a long credit horizon.
+- REMAINING LEVERS: Remove role_conditional (simplify reward signal), BPTT=96 range test, BPTT=64 at 10min
+
+**Exp: no role_conditional + milestones_2:25 + penalize_vibe + ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + 20min (fd4e9cc) — DISCARD**
+- score=0.18, junctions=41.9, aligned=0.1, clips_junctions_held=1,202,365
+- Removed role_conditional from reward variants → CATASTROPHIC: 41.9j vs 552.6j baseline (92% drop!)
+- Without role_conditional, clips completely dominate — cogs cannot hold territory
+- role_conditional provides essential role differentiation: different reward signals guide miner/aligner/scrambler/scout to specialize
+- Without it, all agents get uniform signals and can't coordinate the scramble→align→hold chain effectively
+- ROLE_CONDITIONAL CONCLUSION: role_conditional is ESSENTIAL to junction holding. Do NOT remove it.
+- ALL STANDARD PPO HYPERPARAMS NOW EXHAUSTED. Every tested lever (LR, ent, gae, bptt, clip, vf, epochs, hidden_size, minibatch, gamma, cosine_lr, LR_warmup, PBT_hyperparams, reward_weights, entropy_annealing, role_conditional removal) failed to improve beyond 552.6j baseline.
+- REMAINING IDEAS: rollout_length changes, BPTT=64 at 10min (could beat BPTT=128 at 10min 1029j), architectural changes
+
+**Exp: adam_beta1=0.9 + ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + 25min (d56914e) — DISCARD**
+- score=55.7, junctions=240.8, aligned=0.0, clips_junctions_held=1,195,506
+- Standard Adam beta1=0.9 (vs cogames non-standard 0.95) → WORSE: 240.8j vs 390j baseline at 25min (38% drop!)
+- Reducing momentum did NOT delay overtraining; cogames' 0.95 beta1 is actually better than standard 0.9
+- ADAM_BETA1 CONCLUSION: Do NOT change beta1 from cogames default (0.95). Standard value worse.
+- REMAINING IDEAS: rollout_length changes (number of steps per update), BPTT=64 at 10min
+
+**Exp: stateless MLP policy (no LSTM) + ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + 20min (acb0e3f) — DISCARD**
+- score=63.3, junctions=337.9, aligned=0.1, clips_junctions_held=1,188,517
+- Stateless (MLP) policy instead of LSTM → WORSE: 337.9j vs 552.6j baseline (39% drop!)
+- Hypothesis was: LSTM recurrent state accumulation causes gradient instability at longer runs; stateless policy might be more stable
+- Reality: LSTM recurrence is NECESSARY for junction-holding — stateless agents can't learn the temporal patterns needed
+- STATELESS CONCLUSION: LSTM is essential for junction-holding in CoGames. Stateless policy is significantly weaker.
+- REMAINING IDEAS: rollout_length changes, BPTT=64 at 10min, try different reward variant combinations not yet tested
+
+**Exp: LSTM ent=0.07 + lr=0.001 + bptt=64 + gae=0.95 + 20min (1b00553) — DISCARD**
+- score=68.5, junctions=0.0, aligned=0.0, clips_junctions_held=1,196,418
+- ent=0.07 (lower than best ent=0.10) → CATASTROPHIC: 0j vs 552.6j baseline; clips dominate completely
+- Trend ent=0.10→552j > ent=0.15→541j did NOT continue below 0.10 — there is a sharp lower entropy boundary
+- ent=0.07 too low: agents over-exploit local optima (resource collection) without exploring to find/hold junctions
+- ENT LOWER BOUND CONCLUSION: ent=0.10 is the minimum viable entropy. Going to ent=0.07 causes complete failure.
+- REMAINING IDEAS: rollout_length changes, baseline policy class, BPTT=64 at 10min
+
+**Exp: LSTM ent=0.10 + lr=0.001 + bptt=64 + gae=0.95 + vector_batch_size=256 + 20min (4e68c9c) — DISCARD**
+- score=63.09, junctions=99.4, aligned=0.0, clips_junctions_held=1,194,105
+- vector_batch_size=256 (double default=128) → SEVERE DECLINE: 99.4j vs 552.6j baseline (82% drop!)
+- Longer rollout sequences: 256 steps × 64 envs = 16384 transitions/update (2 gradient steps per rollout)
+- Hypothesis was: LSTM sees 4 BPTT segments per seq (vs 2 with default) → better long-term credit assignment
+- Reality: doubled rollout length HURTS significantly. Fewer gradient updates per time unit causes slower learning.
+- VECTOR_BATCH_SIZE CONCLUSION: default=128 is optimal. Doubling rollout length to 256 causes 82% drop in junctions.
+- REMAINING IDEAS: baseline policy class (class=baseline), BPTT=64 at 10min
+
+**Exp: puffer policy (class=puffer, PufferDefaultPolicy) ent=0.10 bptt=64 gae=0.95 20min (f4d49f9) — DISCARD**
+- score=64.98, junctions=23.5, aligned=0.0, clips_junctions_held=1,194,105
+- PufferDefaultPolicy (GELU encoder + LSTMWrapper + std=0.01 action head) → CATASTROPHIC FAILURE: 23.5j vs 552.6j baseline (96% drop!)
+- class=baseline was invalid policy class (crashed); puffer was next alternative architecture
+- All cog agents stuck collecting resources; clips hold >1M junctions; no agent-driven alignment/scrambling
+- PUFFER CONCLUSION: PufferDefaultPolicy fails entirely for junction holding at 20min. Much worse than even stateless MLP (337.9j).
+- Architecture ranking: LSTM=552.6j >> stateless=337.9j >> puffer=23.5j
+- ALL architectures exhausted. No viable alternatives remain.
+- REMAINING IDEAS: BPTT=64 at 10min (never tested! might beat 1029j BPTT=128 at 10min)
+
+**Exp: BPTT=64 at 10min + ent=0.10 + lstm (38b180d) — DISCARD**
+- score=44.5, junctions=87.4, aligned=0.0, clips_junctions_held=1,196,953
+- BPTT=64 at 10min → CATASTROPHIC: 87.4j vs 1029.8j baseline (BPTT=128 at 10min = 91% drop!)
+- KEY FINDING: BPTT sweet spot is time-budget dependent!
+  - 10min: BPTT=128 → 1029j | BPTT=64 → 87j (BPTT=128 wins 12x)
+  - 20min: BPTT=128 → 162j | BPTT=64 → 552j (BPTT=64 wins 3.4x)
+- Hypothesis: BPTT=128 enables faster early junction discovery (critical for 10min budget)
+  but BPTT=64 provides more stable gradient updates critical for the 20min policy maintenance phase.
+- BPTT=64 CONCLUSION: ONLY optimal at 20min. Terrible at 10min.
+
+**Exp: Two-phase BPTT=128→64 warm-start 20min (28d4af7) — DISCARD**
+- score=57.1, junctions=170.9, aligned=0.1
+- Phase1: BPTT=128, 10min → builds junction policy. Phase2: BPTT=64, 10min from Phase1 checkpoint.
+- Result: 170.9j vs 552.6j baseline (pure BPTT=64 for 20min) — 69% drop!
+- Slight improvement over pure BPTT=128 for 20min (162j→170j) but far from BPTT=64 baseline
+- The warm-start from BPTT=128 does NOT help BPTT=64 fine-tuning; Phase1 policy is misaligned for Phase2
+- TWO-PHASE CONCLUSION: BPTT time-dependence is not exploitable via checkpoint warm-starting.
+  The BPTT contexts are incompatible — policies trained under BPTT=128 don't benefit from BPTT=64 continuation.
+- OVERALL STATUS: All PPO hyperparams, all architectures, all BPTT combinations, all warm-start strategies exhausted.
+  Best results: 1029.8j at 10min (BPTT=128) and 552.6j at 20min (BPTT=64). These are the ceiling for PPO baseline.
