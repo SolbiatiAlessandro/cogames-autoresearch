@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 1200  # 20min: stateless policy experiment
+TIME_BUDGET = 1200  # 20min: ent=0.07 experiment
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -32,17 +32,17 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-# NEW EXPERIMENT: stateless (MLP) policy instead of LSTM
-# Hypothesis: LSTM accumulates recurrent state over training, which may destabilize gradients at 25min+.
-# A stateless policy has no such accumulation — each step is processed independently.
-# This could be more robust at longer timescales even if slightly weaker on temporal credit assignment.
-# All other hyperparams kept at best-known 20min values. Comparing directly vs 552.6j LSTM baseline.
-HIDDEN_SIZE = 256  # keep same capacity
-POLICY = f"class=stateless,kw.hidden_size={HIDDEN_SIZE}"  # stateless = MLP, no recurrence
+# EXPERIMENT: LSTM (best known architecture) with ent=0.07 — testing lower entropy
+# Trend from prior sessions: ent=0.10 → 552j > ent=0.15 → 541j (lower is slightly better).
+# Hypothesis: continuing this trend, ent=0.07 might further improve junction holding via more focused exploitation.
+# ent=0.20 failed completely (0j), all annealing variants failed. Constant low entropy is the pattern.
+# Risk: too-low entropy may cause premature convergence / insufficient exploration to find junctions.
+HIDDEN_SIZE = 256
+POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM: best architecture (stateless=337j, 39% worse)
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
-# This experiment: same config but stateless policy — does removing LSTM recurrence help or hurt?
+# This experiment: ent=0.07 (never tested), everything else at best-known values
 LEARNING_RATE = 0.001    # constant LR (no warmup — warmup failed badly: 99.4j)
 LR_WARMUP_START = 0.001  # no warmup: same as target LR
 LR_WARMUP_DURATION = 0   # disabled
@@ -51,8 +51,8 @@ MINIBATCH_SIZE = 8192  # best known minibatch (16384 failed 27j, 4096 failed 54j
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
 BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
-ENT_COEF_START = 0.10  # best ent
-ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
+ENT_COEF_START = 0.07  # EXPERIMENT: lower entropy (0.10→552j, 0.15→541j, lower=better trend)
+ENT_COEF_END = 0.07    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
 LR_DROP_TIME = 9999    # disabled (step LR failed: 190j; constant LR best)
 LR_FINAL = 0.001       # same as base (no step LR)
@@ -64,7 +64,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = f"stateless MLP policy (no LSTM) ent=0.10 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 20min — hypothesis: LSTM recurrent state accumulation causes gradient instability at 25min+; stateless policy has no such accumulation and may be more stable; comparing against 552.6j LSTM baseline at 20min"
+DESCRIPTION = f"LSTM ent=0.07 gamma=0.999 lr=0.001 bptt=64 gae=0.95 minibatch=8192 20min — lower entropy test; trend: ent=0.10→552j > ent=0.15→541j, testing if ent=0.07 continues improvement; hypothesis: less entropy = more focused exploitation = better junction holding at 20min"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
