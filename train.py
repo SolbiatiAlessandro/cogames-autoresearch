@@ -21,7 +21,7 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # back to main mission: clips present, need scramble+align chain
-TIME_BUDGET = 600  # 10min: BPTT=64 at 10min (NEVER TESTED!) — best 10min was BPTT=128+ent=0.15→1029.8j
+TIME_BUDGET = 1200  # 20min total: Phase1=10min (BPTT=128) + Phase2=10min (BPTT=64 from checkpoint)
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
@@ -32,13 +32,20 @@ REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"
 NUM_AGENTS = 4
 
 # Policy
-# EXPERIMENT: BPTT=64 at 10min — never tested!
-# Best 10min: BPTT=128 + ent=0.15 → 1029.8j (commit 96b72bf)
-# Best 20min: BPTT=64 + ent=0.10 → 552.6j (commit ae6f8d2)
-# BPTT=64 is dramatically better at 20min (552j vs 162j with BPTT=128)
-# Hypothesis: BPTT=64 may also improve or match BPTT=128 at 10min (10min sweet spot for LSTM?)
+# EXPERIMENT: Two-phase training — exploit BPTT time-dependence
+# NEW FINDING (38b180d): BPTT=128 → 1029j at 10min BUT 162j at 20min (overtrains)
+#                        BPTT=64  →  87j at 10min BUT 552j at 20min (stable)
+# Hypothesis: BPTT=128 learns fast early, BPTT=64 avoids overtraining later.
+# Two-phase: Phase1 (BPTT=128, 10min) builds strong junction policy → Phase2 (BPTT=64, 10min from ckpt)
+# Phase2 loads Phase1 checkpoint → continues learning stably without BPTT=128 overtraining
 HIDDEN_SIZE = 256
-POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM — best architecture (552.6j at 20min)
+POLICY = f"class=lstm,kw.hidden_size={HIDDEN_SIZE}"  # LSTM — best architecture
+
+# Two-phase training budgets
+PHASE1_BUDGET = 600   # Phase 1: BPTT=128, 10min — fast early junction learning
+PHASE2_BUDGET = 600   # Phase 2: BPTT=64, 10min from Phase1 ckpt — stable continued learning
+PHASE1_BPTT = 128
+PHASE2_BPTT = 64
 
 # Training hyperparameters
 # Best 20min config: ent=0.10, single LR=0.001, BPTT=64, gae=0.95, minibatch=8192 → 552.6 junctions (ae6f8d2)
@@ -50,7 +57,7 @@ VALUE_LR = 0.001         # same as policy LR
 MINIBATCH_SIZE = 8192  # best known minibatch (16384 failed 27j, 4096 failed 54j)
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
-BPTT_HORIZON = 64  # BPTT=64 is the 20min sweet spot
+BPTT_HORIZON = PHASE1_BPTT  # Phase 1 starts with BPTT=128 (best 10min); Phase 2 uses BPTT=64
 ENT_COEF_START = 0.10  # best known entropy (0.10→552j > 0.15→541j; 0.07→0j FAIL; 0.20→0j FAIL)
 ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
@@ -65,7 +72,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 10min — BPTT=64 at 10min NEVER TESTED; best 10min was BPTT=128+ent=0.15→1029.8j; BPTT=64 massively improved 20min (162j→552j); testing if same benefit at 10min; using ent=0.10 (best 20min entropy)"
+DESCRIPTION = "LSTM ent=0.10 two-phase BPTT=128→64 gae=0.95 lr=0.001 minibatch=8192 20min — two-phase training: Phase1=BPTT128/10min(builds junctions), Phase2=BPTT64/10min-from-ckpt(avoids overtraining); exploits finding: BPTT=128 fast early(1029j@10m) but overtrain(162j@20m), BPTT=64 stable(552j@20m); best of both?"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
@@ -159,12 +166,22 @@ train_module.train(
 """
 
 
-def build_train_command():
-    """Build the training command using cogames Python API (supports reward variants)."""
+def build_train_command(bptt_override=None, initial_weights_path=None, time_budget_override=None):
+    """Build the training command using cogames Python API (supports reward variants).
+
+    Args:
+        bptt_override: Override BPTT_HORIZON (for two-phase training).
+        initial_weights_path: Path to checkpoint to load (for Phase 2 warm-start).
+        time_budget_override: Override TIME_BUDGET for annealing duration.
+    """
+    bptt = bptt_override if bptt_override is not None else BPTT_HORIZON
+    budget = time_budget_override if time_budget_override is not None else TIME_BUDGET
+    # If loading from checkpoint, add data= to policy spec
+    policy = f"{POLICY},data={initial_weights_path}" if initial_weights_path else POLICY
     script = TRAIN_SCRIPT.format(
         mission=MISSION,
         reward_variants=REWARD_VARIANTS,
-        policy=POLICY,
+        policy=policy,
         device=DEVICE,
         num_steps=NUM_STEPS,
         minibatch_size=MINIBATCH_SIZE,
@@ -174,14 +191,14 @@ def build_train_command():
         lr_warmup_duration=LR_WARMUP_DURATION,
         value_lr=VALUE_LR,
         gamma=GAMMA,
-        bptt_horizon=BPTT_HORIZON,
+        bptt_horizon=bptt,
         gae_lambda=GAE_LAMBDA,
         ent_start=ENT_COEF_START,
         ent_end=ENT_COEF_END,
         vector_num_envs=VECTOR_NUM_ENVS,
         vector_batch_size=VECTOR_BATCH_SIZE,
         vector_num_workers=VECTOR_NUM_WORKERS,
-        time_budget=TIME_BUDGET,
+        time_budget=budget,
         lr_drop_time=LR_DROP_TIME,
         lr_final=LR_FINAL,
     )
@@ -317,27 +334,10 @@ def log_to_results_tsv(
         )
 
 
-def main():
-    t_start = time.time()
-
-    experiment_start_time = time.time()
-
-    print("=" * 60)
-    print("CoGames Autoresearch Training")
-    print("=" * 60)
-    print(f"Mission:          {MISSION}")
-    print(f"Policy:           {POLICY}")
-    print(f"Reward variants:  {REWARD_VARIANTS}")
-    print(f"Learning rate:    {LEARNING_RATE}")
-    print(f"Minibatch size:   {MINIBATCH_SIZE}")
-    print(f"Time budget:      {TIME_BUDGET}s")
-    print(f"Device:           {DEVICE}")
-    print("=" * 60)
-
-    cmd = build_train_command()
-    print(f"\nRunning: uv run python -c <train_script> (mission={MISSION}, variants={REWARD_VARIANTS})\n")
-
-    # Run training with time budget enforcement
+def run_training_phase(cmd, budget, phase_label):
+    """Run a training subprocess for up to `budget` seconds, streaming output.
+    Returns (output_lines, returncode)."""
+    t_phase = time.time()
     output_lines = []
     try:
         process = subprocess.Popen(
@@ -345,33 +345,75 @@ def main():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1,  # line-buffered
+            bufsize=1,
         )
-
-        # Stream output line by line, enforce time budget
         for line in iter(process.stdout.readline, ""):
             line = line.rstrip("\n")
             output_lines.append(line)
             print(line, flush=True)
-
-            elapsed = time.time() - t_start
-            if elapsed > TIME_BUDGET:
-                print(f"\n[TIME BUDGET] {TIME_BUDGET}s exceeded, stopping training...")
+            if time.time() - t_phase > budget:
+                print(f"\n[{phase_label} TIME BUDGET] {budget}s exceeded, stopping...")
                 process.terminate()
                 try:
                     process.wait(timeout=30)
                 except subprocess.TimeoutExpired:
                     process.kill()
                 break
-
         process.wait()
         returncode = process.returncode or 0
-
     except FileNotFoundError:
         print("ERROR: 'uv' not found.")
         sys.exit(1)
+    return output_lines, returncode
 
-    training_seconds = time.time() - t_start
+
+def main():
+    experiment_start_time = time.time()
+
+    print("=" * 60)
+    print("CoGames Autoresearch Training — TWO-PHASE")
+    print("=" * 60)
+    print(f"Mission:          {MISSION}")
+    print(f"Policy:           {POLICY}")
+    print(f"Reward variants:  {REWARD_VARIANTS}")
+    print(f"Learning rate:    {LEARNING_RATE}")
+    print(f"Minibatch size:   {MINIBATCH_SIZE}")
+    print(f"Phase 1:          BPTT={PHASE1_BPTT}, {PHASE1_BUDGET}s")
+    print(f"Phase 2:          BPTT={PHASE2_BPTT}, {PHASE2_BUDGET}s (from Phase1 checkpoint)")
+    print(f"Device:           {DEVICE}")
+    print("=" * 60)
+
+    # -----------------------------------------------------------------------
+    # Phase 1: BPTT=128, 10min — fast early junction learning
+    # -----------------------------------------------------------------------
+    print(f"\n{'='*60}")
+    print(f"PHASE 1: BPTT={PHASE1_BPTT}, budget={PHASE1_BUDGET}s")
+    print(f"{'='*60}\n")
+    cmd_p1 = build_train_command(bptt_override=PHASE1_BPTT, time_budget_override=PHASE1_BUDGET)
+    output_lines_p1, returncode_p1 = run_training_phase(cmd_p1, PHASE1_BUDGET, "PHASE1")
+    phase1_seconds = time.time() - experiment_start_time
+
+    # Find Phase 1 checkpoint
+    checkpoint_p1 = find_latest_checkpoint()
+    print(f"\n[Phase 1 done in {phase1_seconds:.0f}s] Checkpoint: {checkpoint_p1}")
+
+    # -----------------------------------------------------------------------
+    # Phase 2: BPTT=64, 10min — stable continued learning from Phase1 ckpt
+    # -----------------------------------------------------------------------
+    print(f"\n{'='*60}")
+    print(f"PHASE 2: BPTT={PHASE2_BPTT}, budget={PHASE2_BUDGET}s, loading from Phase1 ckpt")
+    print(f"{'='*60}\n")
+    cmd_p2 = build_train_command(
+        bptt_override=PHASE2_BPTT,
+        initial_weights_path=checkpoint_p1,
+        time_budget_override=PHASE2_BUDGET,
+    )
+    output_lines_p2, returncode_p2 = run_training_phase(cmd_p2, PHASE2_BUDGET, "PHASE2")
+    training_seconds = time.time() - experiment_start_time
+
+    # Use Phase 2 output for final metrics (that's what we care about)
+    output_lines = output_lines_p2
+    returncode = returncode_p2
 
     # ---------------------------------------------------------------------------
     # Extract metrics from training output
