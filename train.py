@@ -28,7 +28,7 @@ TIME_BUDGET = 1200  # 20min — same budget as best config (ae6f8d2)
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:50", "role_conditional", "penalize_vibe_change"]  # NEW: higher milestone weight (only :25 tested at 20min → 552.6j)
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional"]  # NEW: remove penalize_vibe_change — never tested without it at 20min ent=0.10; role_conditional may make it redundant
 NUM_AGENTS = 4
 
 # Policy
@@ -60,7 +60,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:50 + role_conditional + penalize_vibe_change LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 machina 20min — NEW: milestone weight 50 (double the :25 that gave 552.6j at ae6f8d2); only :25 tested at 20min, higher weight may push agents harder toward junction control; all other hyperparams at best-known values"
+DESCRIPTION = "milestones_2:25 + role_conditional (NO penalize_vibe_change) LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 machina 20min — FIRST TEST: removing penalize_vibe_change from best combo (552.6j baseline); penalize_vibe_change has been in EVERY experiment but never isolated; with role_conditional providing role differentiation, vibe penalty may be redundant or harmful"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
