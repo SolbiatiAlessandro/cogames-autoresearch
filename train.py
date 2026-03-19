@@ -21,14 +21,14 @@ from datetime import datetime
 
 from prepare import TIME_BUDGET as _DEFAULT_TIME_BUDGET, MISSION as _DEFAULT_MISSION, compute_composite_score
 MISSION = "cogsguard_machina_1.basic"  # best known map (arena failed: 83.4j vs machina 552.6j)
-TIME_BUDGET = 1500  # 25min — testing if lower compounding factor (:20 vs :25) stabilizes longer runs
+TIME_BUDGET = 540  # 9min — testing BPTT=256 at 10min: BPTT=128→1029j, BPTT=64→87j; does BPTT=256 beat 128?
 
 # ---------------------------------------------------------------------------
 # Configuration — the agent can change ALL of these
 # ---------------------------------------------------------------------------
 
 # Mission and reward setup
-REWARD_VARIANTS = ["milestones_2:20", "role_conditional", "penalize_vibe_change"]  # NEW: milestones_2:20 (lower compounding than best :25) + full best combo; hypothesis: :25 overtrained at 25min (390j), :20 less aggressive signal may stabilize 25min training; :50 failed (46j), :25 best at 20min (552j) — exploring lower end of compounding range
+REWARD_VARIANTS = ["milestones_2:25", "role_conditional", "penalize_vibe_change"]  # BEST KNOWN: milestones_2:25 + role_conditional + penalize_vibe_change → 552.6j at 20min, 1029j at 10min
 NUM_AGENTS = 4
 
 # Policy
@@ -45,9 +45,9 @@ VALUE_LR = 0.001         # same as policy LR
 MINIBATCH_SIZE = 8192  # best known minibatch (16384 failed 27j, 4096 failed 54j)
 GAMMA = 0.999  # best gamma (0.999 → 552.6j; 0.99 → 124.1j FAIL)
 GAE_LAMBDA = 0.95  # best GAE from prior sessions (gae=0.98 tested → 447j, 0.95 best=552j)
-BPTT_HORIZON = 64  # best known for 20min (128 overtrained)
-ENT_COEF_START = 0.10  # best known entropy (0.10→552j > 0.15→541j; 0.07→0j FAIL; 0.20→0j FAIL)
-ENT_COEF_END = 0.10    # constant entropy (no annealing — all annealing variants fail)
+BPTT_HORIZON = 256  # NEW: testing BPTT=256 at 10min — BPTT=128→1029j, BPTT=64→87j at 10min; longer context hypothesis
+ENT_COEF_START = 0.15  # best 10min entropy (0.15 + BPTT=128 → 1029j at 10min; ent=0.10 optimal at 20min)
+ENT_COEF_END = 0.15    # constant entropy (no annealing — all annealing variants fail)
 ENT_COEF = ENT_COEF_START  # placeholder for logging
 VECTOR_BATCH_SIZE = 128  # default rollout (256 tested → 99.4j, 82% drop!)
 LR_DROP_TIME = 9999    # disabled (step LR failed: 190j; constant LR best)
@@ -60,7 +60,7 @@ VECTOR_NUM_ENVS = 64   # cap env count (safe default)
 VECTOR_NUM_WORKERS = 8  # cap worker processes (default uses all physical cores = 48 here)
 
 # Experiment description (for results.tsv logging)
-DESCRIPTION = "milestones_2:20 + role_conditional + penalize_vibe_change LSTM ent=0.10 bptt=64 gae=0.95 lr=0.001 minibatch=8192 machina 25min — NOVEL: lower compounding factor (:20 vs best :25) to test if reduced reward intensity combats overtraining at 25min; :25@20min=552.6j, :25@25min=390j (29% drop), :50@20min=46j (fail); hypothesis: :20 less aggressive = more stable policy at 25min, potentially >552.6j at 25min; all other hyperparams at best-known values"
+DESCRIPTION = "milestones_2:25 + role_conditional + penalize_vibe_change LSTM ent=0.15 bptt=256 gae=0.95 lr=0.001 minibatch=8192 machina 9min — NOVEL: BPTT=256 at 10min extending BPTT upward; best 10min BPTT=128(1029j,96b72bf), BPTT=64 failed at 10min(87j); trend: smaller BPTT=worse at 10min; hypothesis BPTT=256 doubles context=more gradient signal per step=faster learning; using best 10min params (ent=0.15, lr=0.001)"
 
 # ---------------------------------------------------------------------------
 # Training — use cogames Python API directly to support reward variants
